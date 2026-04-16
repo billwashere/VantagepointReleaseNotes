@@ -1,37 +1,44 @@
 name: Scrape & Deploy Release Notes
 
 on:
-  # Run on a schedule — every Monday at 06:00 UTC
   schedule:
-    - cron: "0 6 * * 1"
-  # Allow manual trigger from Actions UI
+    - cron: "0 6 * * 1"   # every Monday 06:00 UTC
   workflow_dispatch:
-  # Also run when pushing changes to main
   push:
     branches: [main]
     paths:
       - "scraper/**"
       - "web/**"
+      - "tests/**"
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests beautifulsoup4 lxml pytest
+      - name: Run parser tests (no network needed)
+        run: python -m pytest tests/ -v
+
   scrape-and-deploy:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # push db + site to gh-pages branch
+      contents: write
       pages: write
       id-token: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install requests beautifulsoup4 lxml
+      - run: pip install requests beautifulsoup4 lxml
 
       - name: Restore cached database
         uses: actions/cache@v4
@@ -41,13 +48,16 @@ jobs:
           key: release-notes-db-${{ hashFiles('scraper/scraper.py') }}
           restore-keys: release-notes-db-
 
-      - name: Run scraper (resume mode for speed)
-        run: python scraper/scraper.py --resume
+      - name: Run scraper
+        # --resume  : skip already-scraped old releases
+        # --recheck 10 : always re-fetch last 10 releases to detect retroactive amendments
+        # --concurrency 4 : parallel fetches (polite — 0.5s delay per worker)
+        run: python scraper/scraper.py --resume --recheck 10 --concurrency 4
 
       - name: Copy DB to web directory
         run: cp db/release_notes.db web/release_notes.db
 
-      - name: Save updated database to cache
+      - name: Save updated database
         uses: actions/cache/save@v4
         with:
           path: db/release_notes.db
@@ -59,4 +69,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./web
           publish_branch: gh-pages
-          cname: ""   # set your custom domain here if you have one
+          cname: ""   # set your custom domain here if needed

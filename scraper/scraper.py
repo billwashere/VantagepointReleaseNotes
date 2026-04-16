@@ -327,11 +327,20 @@ SECTION_PATTERNS = {
     "defect":      re.compile(r"software\s+issues?\s+resolved", re.I),
     "security":    re.compile(r"security\s+enhancements?", re.I),
 }
-DEFECT_RE            = re.compile(r"Defect\s+(\d+)\s*[:–-]\s*(.*)", re.DOTALL | re.IGNORECASE)
+# \s* (not \s+) handles "Defect1541790:" (no space between keyword and number),
+# which some pages produce when the number is wrapped in <strong> with no trailing space.
+DEFECT_RE            = re.compile(r"Defect\s*(\d+)\s*[:–-]\s*(.*)", re.DOTALL | re.IGNORECASE)
 BREADCRUMB_SEP_RE    = re.compile(r"\s*>>\s*")
 PAGE_LAST_UPDATED_RE = re.compile(
     r"Last\s+Updated\s*:\s*([A-Za-z]+ \d{1,2},\s*\d{4})", re.IGNORECASE
 )
+# Maximum length for a single-level breadcrumb (no '>>'). Real Vantagepoint
+# module names: "API" (3), "Billing" (7), "Ask Dela" (8), "Dashboards" (10),
+# "Resource Management" (19), "Deltek Learning Hub" (19) — all well under 25.
+# Enhancement/regulatory titles like "New API Endpoint for Report Generation"
+# (38) or "Federal Income Tax Withholding 2025 Updates" (43) exceed this and
+# must NOT be treated as breadcrumbs.
+_MAX_SINGLE_LEVEL_BC = 25
 
 
 def parse_date(raw: str) -> str | None:
@@ -379,6 +388,7 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
     issues: list[dict] = []
     current_section: str | None = None
     nav1 = nav2 = nav3 = breadcrumb = ""
+    pending_title: str | None = None   # bold enhancement/regulatory title waiting for its description
 
     for tag in body.descendants:
         if not hasattr(tag, "name") or not tag.name:
@@ -397,16 +407,40 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
             if matched_section:
                 current_section = matched_section
                 nav1 = nav2 = nav3 = breadcrumb = ""
+                pending_title = None
                 continue   # section heading consumed — move on
 
             if not current_section:
                 continue   # not yet inside a known section
 
             # ── 2. Detect breadcrumb / category headers ───────────────────
-            bold    = tag.find(["strong", "b"])
-            has_sep = ">>" in text
-            if len(text) < 180 and not DEFECT_RE.match(text) and (bold or has_sep):
-                if has_sep or current_section == "defect":
+            #
+            # A tag is a breadcrumb header when it meets ALL of:
+            #   a) Does not match DEFECT_RE (guards against bold defect numbers
+            #      like <strong>Defect1541790</strong> slipping through)
+            #   b) Either has '>>' separator (any length allowed), OR is a
+            #      purely-bold standalone heading ≤ 40 chars (module names like
+            #      "Federal", "Billing", "Ask Dela" – NOT enhancement titles)
+            #
+            # is_heading_only: the <strong>/<b> text IS the entire tag text.
+            # This rejects cases like:
+            #   <p><strong>Defect1541790</strong>: long description...</p>
+            #   → bold text ≠ full text → not a breadcrumb
+            # And cases like:
+            #   <p><strong>Federal Income Tax Withholding 2025 Updates</strong></p>
+            #   → bold == full text BUT len > 40 → not a breadcrumb
+            bold         = tag.find(["strong", "b"])
+            has_sep      = ">>" in text
+            is_heading_only = (
+                bold is not None
+                and clean_text(bold.get_text()) == clean_text(text)
+            )
+
+            if not DEFECT_RE.match(text) and (
+                has_sep
+                or (is_heading_only and len(text) <= _MAX_SINGLE_LEVEL_BC)
+            ):
+                if has_sep:
                     bc, l1, l2, l3 = parse_breadcrumb(text)
                     if l1:
                         breadcrumb, nav1, nav2, nav3 = bc, l1, l2, l3
@@ -437,26 +471,78 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 "category": nav1,          "subcategory": nav2,
                 "title": title,            "description": desc,
             })
+            pending_title = None   # defects never accumulate a pending title
             continue
 
         if current_section in ("enhancement", "regulatory", "security"):
             if len(text) < 30 or text.lower() == nav1.lower():
                 continue
-            tm = re.match(r"^(.{10,200}?[.!?])\s", text)
-            issues.append({
-                "type": current_section,  "defect_number": None,
-                "breadcrumb": breadcrumb, "nav_level1": nav1,
-                "nav_level2": nav2,       "nav_level3": nav3,
-                "category": nav1,         "subcategory": nav2,
-                "title": tm.group(1) if tm else text[:200],
-                "description": text,
-            })
 
-    # Deduplicate within page
+            bold        = tag.find(["strong", "b"])
+            is_title    = (
+                bold is not None
+                and clean_text(bold.get_text()) == clean_text(text)
+                and len(text) > _MAX_SINGLE_LEVEL_BC  # short ones were already breadcrumbs
+            )
+
+            if is_title:
+                # This bold paragraph is an enhancement/regulatory item TITLE.
+                # Flush any previous unflushed pending title as a standalone issue,
+                # then hold this one until we see its description paragraph.
+                if pending_title:
+                    tm = re.match(r"^(.{10,200}?[.!?])\s", pending_title)
+                    issues.append({
+                        "type": current_section,  "defect_number": None,
+                        "breadcrumb": breadcrumb,  "nav_level1": nav1,
+                        "nav_level2": nav2,        "nav_level3": nav3,
+                        "category": nav1,          "subcategory": nav2,
+                        "title": tm.group(1) if tm else pending_title[:200],
+                        "description": pending_title,
+                    })
+                pending_title = text
+            else:
+                # Plain description paragraph.
+                if pending_title:
+                    # Merge: the pending bold title is the issue title, this is the desc.
+                    tm = re.match(r"^(.{10,200}?[.!?])\s", pending_title)
+                    issues.append({
+                        "type": current_section,  "defect_number": None,
+                        "breadcrumb": breadcrumb,  "nav_level1": nav1,
+                        "nav_level2": nav2,        "nav_level3": nav3,
+                        "category": nav1,          "subcategory": nav2,
+                        "title": tm.group(1) if tm else pending_title[:200],
+                        "description": text,
+                    })
+                    pending_title = None
+                else:
+                    # No pending title: first sentence becomes title as before.
+                    tm = re.match(r"^(.{10,200}?[.!?])\s", text)
+                    issues.append({
+                        "type": current_section,  "defect_number": None,
+                        "breadcrumb": breadcrumb,  "nav_level1": nav1,
+                        "nav_level2": nav2,        "nav_level3": nav3,
+                        "category": nav1,          "subcategory": nav2,
+                        "title": tm.group(1) if tm else text[:200],
+                        "description": text,
+                    })
+
+    # Flush any trailing pending title (last item on page with no following paragraph)
+    if pending_title and current_section in ("enhancement", "regulatory", "security"):
+        tm = re.match(r"^(.{10,200}?[.!?])\s", pending_title)
+        issues.append({
+            "type": current_section,  "defect_number": None,
+            "breadcrumb": breadcrumb,  "nav_level1": nav1,
+            "nav_level2": nav2,        "nav_level3": nav3,
+            "category": nav1,          "subcategory": nav2,
+            "title": tm.group(1) if tm else pending_title[:200],
+            "description": pending_title,
+        })
+
+    # Deduplicate within page using the same stable key used by the DB
     seen: set = set()
     deduped = []
     for i in issues:
-        k = (i["type"], i.get("defect_number") or "", i["title"][:100])
+        k = make_issue_key(i)
         if k not in seen:
             seen.add(k)
             deduped.append(i)
