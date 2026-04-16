@@ -1,0 +1,62 @@
+name: Scrape & Deploy Release Notes
+
+on:
+  # Run on a schedule — every Monday at 06:00 UTC
+  schedule:
+    - cron: "0 6 * * 1"
+  # Allow manual trigger from Actions UI
+  workflow_dispatch:
+  # Also run when pushing changes to main
+  push:
+    branches: [main]
+    paths:
+      - "scraper/**"
+      - "web/**"
+
+jobs:
+  scrape-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push db + site to gh-pages branch
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Restore cached database
+        uses: actions/cache@v4
+        id: db-cache
+        with:
+          path: db/release_notes.db
+          key: release-notes-db-${{ hashFiles('scraper/scraper.py') }}
+          restore-keys: release-notes-db-
+
+      - name: Run scraper (resume mode for speed)
+        run: python scraper/scraper.py --resume
+
+      - name: Copy DB to web directory
+        run: cp db/release_notes.db web/release_notes.db
+
+      - name: Save updated database to cache
+        uses: actions/cache/save@v4
+        with:
+          path: db/release_notes.db
+          key: release-notes-db-${{ hashFiles('db/release_notes.db') }}-${{ github.run_id }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          publish_branch: gh-pages
+          cname: ""   # set your custom domain here if you have one
