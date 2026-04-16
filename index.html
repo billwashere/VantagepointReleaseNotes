@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deltek Vantagepoint — Release Notes Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0b0e14;
+  --bg2:       #111520;
+  --bg3:       #181d2b;
+  --border:    #1e2436;
+  --border2:   #252d42;
+  --text:      #c8d0e8;
+  --dim:       #5a6480;
+  --med:       #8b96b8;
+  --accent:    #3d9eff;
+  --accent-dim:#1a4a80;
+  --defect:    #ff5050;
+  --defect-bg: rgba(255,80,80,.08);
+  --enhance:   #38d986;
+  --enhance-bg:rgba(56,217,134,.08);
+  --reg:       #ffbe00;
+  --reg-bg:    rgba(255,190,0,.08);
+  --security:  #a78bfa;
+  --security-bg:rgba(167,139,250,.1);
+  --ported:    #ff9a3c;
+  --ported-bg: rgba(255,154,60,.08);
+  --nav-l1:    #60a5fa;
+  --nav-l2:    #a78bfa;
+  --nav-l3:    #34d399;
+  --mono: "IBM Plex Mono", monospace;
+  --sans: "Syne", sans-serif;
+  --r:    6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input{font-family:var(--mono)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* TOP BAR */
+#topbar{display:flex;align-items:center;gap:14px;padding:0 18px;height:52px;
+  background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;z-index:20}
+.logo{font-weight:800;font-size:1rem;letter-spacing:-.01em;color:#fff;display:flex;align-items:center;gap:9px;white-space:nowrap}
+.logo span{color:var(--accent)}
+.logo-sq{display:grid;grid-template-columns:1fr 1fr;gap:2.5px;width:19px;height:19px}
+.logo-sq i{border-radius:2px;background:var(--accent)}
+.logo-sq i:nth-child(2){opacity:.5}
+.logo-sq i:nth-child(3){opacity:.5}
+.logo-sq i:nth-child(4){opacity:.2}
+.vdiv{width:1px;height:22px;background:var(--border2)}
+#search-wrap{flex:1;max-width:460px;position:relative}
+#search{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);
+  color:var(--text);padding:6px 11px 6px 33px;font-size:.82rem;outline:none;transition:border-color .15s}
+#search:focus{border-color:var(--accent)}
+#search::placeholder{color:var(--dim)}
+.sico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--dim);pointer-events:none}
+#statsbar{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--dim);white-space:nowrap}
+#statsbar b{color:var(--med)}
+
+/* BODY */
+#body{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+#sidebar{width:264px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+  overflow-y:auto;padding:10px 0;display:flex;flex-direction:column;gap:0}
+.sb-section{padding-bottom:4px}
+.sb-label{padding:8px 14px 5px;font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim)}
+
+/* Type filters */
+.tf{display:flex;align-items:center;gap:9px;padding:6px 14px;cursor:pointer;
+  border-left:2px solid transparent;font-size:.82rem;transition:background .1s}
+.tf:hover{background:var(--bg3)}
+.tf.act{background:var(--bg3);border-left-color:var(--accent)}
+.tf .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tf .cnt{margin-left:auto;font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+
+/* Breadcrumb tree */
+.bc-tree{padding:0 8px}
+.bc-l1-wrap{margin-bottom:2px}
+.bc-l1-btn{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;
+  border-radius:var(--r);font-size:.78rem;color:var(--med);transition:background .1s,color .1s}
+.bc-l1-btn:hover{background:var(--bg3);color:var(--text)}
+.bc-l1-btn.sel{background:var(--bg3);color:var(--nav-l1)}
+.bc-l1-btn.sel .arrow{transform:rotate(90deg)}
+.arrow{font-size:.6rem;transition:transform .15s;flex-shrink:0;color:var(--dim)}
+.bc-l1-dot{width:6px;height:6px;border-radius:50%;background:var(--nav-l1);flex-shrink:0;opacity:.6}
+.bc-l2-list{display:none;padding-left:16px}
+.bc-l1-btn.open + .bc-l2-list{display:block}
+.bc-l2-wrap{margin-bottom:1px}
+.bc-l2-btn{display:flex;align-items:center;gap:6px;width:100%;padding:4px 8px;
+  border-radius:var(--r);font-size:.75rem;color:var(--dim);transition:background .1s,color .1s}
+.bc-l2-btn:hover{background:var(--bg3);color:var(--text)}
+.bc-l2-btn.sel{background:rgba(167,139,250,.08);color:var(--nav-l2)}
+.bc-l2-btn.sel .arrow{transform:rotate(90deg)}
+.bc-l2-dot{width:5px;height:5px;border-radius:50%;background:var(--nav-l2);flex-shrink:0;opacity:.6}
+.bc-l3-list{display:none;padding-left:14px}
+.bc-l2-btn.open + .bc-l3-list{display:block}
+.bc-l3-btn{display:flex;align-items:center;gap:5px;width:100%;padding:3px 8px;
+  border-radius:var(--r);font-family:var(--mono);font-size:.68rem;color:var(--dim);
+  transition:background .1s,color .1s}
+.bc-l3-btn:hover{background:var(--bg3);color:var(--text)}
+.bc-l3-btn.sel{background:rgba(52,211,153,.08);color:var(--nav-l3)}
+.bc-l3-dot{width:5px;height:5px;border-radius:50%;background:var(--nav-l3);flex-shrink:0;opacity:.6}
+.bc-cnt{margin-left:auto;font-family:var(--mono);font-size:.65rem;color:var(--dim)}
+
+/* Version list */
+.v-tree{padding:0 8px}
+.v-maj-btn{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;
+  border-radius:var(--r);font-size:.78rem;color:var(--med);transition:background .1s,color .1s}
+.v-maj-btn:hover{background:var(--bg3);color:var(--text)}
+.v-maj-btn.open .arrow{transform:rotate(90deg)}
+.v-patches{display:none;padding-left:16px}
+.v-maj-btn.open + .v-patches{display:block}
+.v-patch-btn{display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:3px 8px;border-radius:var(--r);font-family:var(--mono);font-size:.72rem;
+  color:var(--dim);transition:background .1s,color .1s}
+.v-patch-btn:hover{background:var(--bg3);color:var(--text)}
+.v-patch-btn.sel{background:var(--accent-dim);color:var(--accent)}
+
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* Toolbar */
+#toolbar{display:flex;align-items:center;gap:8px;padding:9px 14px;
+  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg);min-height:44px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;
+  font-family:var(--mono);font-size:.68rem;cursor:pointer;border:1px solid var(--border2);
+  color:var(--dim);background:var(--bg2);transition:all .12s}
+.chip:hover{border-color:var(--med)}
+.chip.act{border-color:var(--accent);color:var(--accent);background:rgba(61,158,255,.08)}
+.chip .cdot{width:5px;height:5px;border-radius:50%}
+#rcnt{font-family:var(--mono);font-size:.68rem;color:var(--dim);white-space:nowrap}
+
+/* Table */
+#tbl-wrap{flex:1;overflow-y:auto}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead{position:sticky;top:0;z-index:5}
+thead tr{background:var(--bg2);border-bottom:1px solid var(--border)}
+th{padding:9px 11px;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;white-space:nowrap}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--text)}
+th.sort-asc::after{content:" ▲"}
+th.sort-desc::after{content:" ▼"}
+th:nth-child(1){width:108px}
+th:nth-child(2){width:100px}
+th:nth-child(3){width:auto}   /* breadcrumb */
+th:nth-child(4){width:auto}   /* title */
+th:nth-child(5){width:90px}
+th:nth-child(6){width:82px}
+tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .08s}
+tbody tr:hover{background:var(--bg3)}
+tbody tr.exp{background:var(--bg3)}
+td{padding:9px 11px;font-size:.8rem;vertical-align:top;line-height:1.4}
+
+.vbadge{display:inline-block;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:4px;padding:2px 6px;font-family:var(--mono);font-size:.68rem;color:var(--med)}
+.tbadge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:3px;
+  font-family:var(--mono);font-size:.67rem;font-weight:500}
+.tbadge.defect     {background:var(--defect-bg);color:var(--defect)}
+.tbadge.enhancement{background:var(--enhance-bg);color:var(--enhance)}
+.tbadge.regulatory {background:var(--reg-bg);color:var(--reg)}
+.tbadge.security   {background:var(--security-bg);color:var(--security)}
+
+/* Breadcrumb display in table cell */
+.bc-cell{display:flex;flex-wrap:wrap;align-items:center;gap:3px;font-family:var(--mono);font-size:.67rem}
+.bc-seg{padding:1px 5px;border-radius:3px}
+.bc-seg.l1{background:rgba(96,165,250,.1);color:var(--nav-l1)}
+.bc-seg.l2{background:rgba(167,139,250,.08);color:var(--nav-l2)}
+.bc-seg.l3{background:rgba(52,211,153,.08);color:var(--nav-l3)}
+.bc-arrow{color:var(--dim);font-size:.6rem}
+
+.pbadge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;
+  font-family:var(--mono);font-size:.65rem;background:var(--ported-bg);color:var(--ported);
+  border:1px solid rgba(255,154,60,.2)}
+.dnum{font-family:var(--mono);font-size:.67rem;color:var(--dim);display:block}
+
+/* Expanded row detail */
+.detail-row td{padding:0}
+.detail-inner{padding:14px 18px 18px;background:var(--bg3);border-left:3px solid var(--border2);
+  margin:0 4px 4px;border-radius:0 0 var(--r) var(--r);font-size:.8rem;line-height:1.6}
+.d-meta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:11px;
+  font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+.d-meta b{color:var(--med)}
+.d-breadcrumb{display:flex;align-items:center;gap:4px;margin-bottom:11px;font-family:var(--mono);font-size:.7rem}
+.d-desc{color:var(--med);line-height:1.65}
+.v-chain{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.vc-item{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;
+  background:var(--bg2);border:1px solid var(--border2);font-family:var(--mono);font-size:.68rem;color:var(--med)}
+.vc-item.cur{border-color:var(--accent-dim);color:var(--accent)}
+.vc-lbl{font-family:var(--mono);font-size:.62rem;color:var(--dim);margin-bottom:5px;margin-top:12px}
+
+/* Loading / empty */
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:14px;color:var(--dim);font-family:var(--mono);font-size:.78rem}
+.spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#empty{display:none;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:8px;color:var(--dim);font-family:var(--mono);font-size:.8rem;text-align:center;padding:40px}
+
+mark{background:rgba(61,158,255,.22);color:var(--accent);border-radius:2px;padding:0 1px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="logo">
+      <div class="logo-sq"><i></i><i></i><i></i><i></i></div>
+      Vantagepoint <span>Release Notes</span>
+    </div>
+    <div class="vdiv"></div>
+    <div id="search-wrap">
+      <svg class="sico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" type="text" placeholder="Search issues, defect numbers, modules…" autocomplete="off">
+    </div>
+    <div id="statsbar">Loading…</div>
+  </div>
+
+  <div id="body">
+
+    <!-- SIDEBAR -->
+    <nav id="sidebar">
+
+      <!-- Type filters -->
+      <div class="sb-section">
+        <div class="sb-label">Issue Type</div>
+        <div class="tf act" data-type="all"><div class="dot" style="background:var(--med)"></div>All Issues<span class="cnt" id="cnt-all">—</span></div>
+        <div class="tf" data-type="defect"><div class="dot" style="background:var(--defect)"></div>Defects<span class="cnt" id="cnt-defect">—</span></div>
+        <div class="tf" data-type="enhancement"><div class="dot" style="background:var(--enhance)"></div>Enhancements<span class="cnt" id="cnt-enhancement">—</span></div>
+        <div class="tf" data-type="regulatory"><div class="dot" style="background:var(--reg)"></div>Regulatory<span class="cnt" id="cnt-regulatory">—</span></div>
+        <div class="tf" data-type="security"><div class="dot" style="background:var(--security)"></div>Security<span class="cnt" id="cnt-security">—</span></div>
+        <div class="tf" data-type="ported" style="margin-top:2px;border-top:1px solid var(--border)">
+          <div class="dot" style="background:var(--ported)"></div>Ported Defects<span class="cnt" id="cnt-ported">—</span>
+        </div>
+      </div>
+
+      <!-- Breadcrumb tree -->
+      <div class="sb-section">
+        <div class="sb-label">Application Area</div>
+        <div class="bc-tree" id="bc-tree"><!-- populated by JS --></div>
+      </div>
+
+      <!-- Version tree -->
+      <div class="sb-section">
+        <div class="sb-label">Version</div>
+        <div class="v-tree" id="v-tree"><!-- populated by JS --></div>
+      </div>
+
+    </nav>
+
+    <!-- MAIN -->
+    <div id="main">
+      <div id="toolbar">
+        <div class="chips" id="chips"></div>
+        <div id="rcnt">— results</div>
+      </div>
+
+      <div id="tbl-wrap">
+        <div id="loading">
+          <div class="spinner"></div>
+          <span id="loading-msg">Loading database…</span>
+        </div>
+        <div id="empty">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          No issues match your filters.
+        </div>
+        <table id="tbl" style="display:none">
+          <thead><tr>
+            <th class="sortable" data-col="patch_version">Version</th>
+            <th>Type</th>
+            <th class="sortable" data-col="breadcrumb">App Area</th>
+            <th class="sortable" data-col="title">Title / Defect</th>
+            <th>Ported</th>
+            <th class="sortable" data-col="release_date">Date</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const DB_URL      = "./release_notes.db";
+const SQLJS_JS    = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js";
+const SQLJS_WASM  = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm";
+
+// ── STATE ────────────────────────────────────────────────────────
+let db, allRows = [];
+let expandedIdx = null;
+let sortCol = "release_date", sortDir = "desc";
+let filterType = "all";
+let filterVersion = null;     // patch_version string
+let filterNav1 = null;        // nav_level1 string
+let filterNav2 = null;        // nav_level2 string
+let filterNav3 = null;        // nav_level3 string
+let searchQ = "";
+
+// ── DB ───────────────────────────────────────────────────────────
+async function init() {
+  setMsg("Loading sql.js…");
+  const s = document.createElement("script"); s.src = SQLJS_JS;
+  document.head.appendChild(s);
+  await new Promise((ok, fail) => { s.onload = ok; s.onerror = fail; });
+
+  setMsg("Loading database…");
+  const SQL = await initSqlJs({ locateFile: () => SQLJS_WASM });
+  const buf = await fetch(DB_URL).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.arrayBuffer();
+  });
+  db = new SQL.Database(new Uint8Array(buf));
+  setMsg("Building UI…");
+  buildBcTree();
+  buildVersionTree();
+  updateCounts();
+  runQuery();
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("tbl").style.display = "";
+}
+
+function setMsg(m){ document.getElementById("loading-msg").textContent = m; }
+
+function Q(sql, params = []) {
+  const st = db.prepare(sql); st.bind(params);
+  const rows = [];
+  while (st.step()) rows.push(st.getAsObject());
+  st.free();
+  return rows;
+}
+function Q1(sql, params = []) { return Q(sql, params)[0] || null; }
+
+// ── SIDEBAR: BREADCRUMB TREE ──────────────────────────────────────
+function buildBcTree() {
+  const tree = {};
+  Q(`SELECT DISTINCT nav_level1, nav_level2, nav_level3,
+       COUNT(*) as n FROM issues
+     WHERE nav_level1 != ''
+     GROUP BY nav_level1, nav_level2, nav_level3
+     ORDER BY nav_level1, nav_level2, nav_level3`
+  ).forEach(r => {
+    if (!tree[r.nav_level1]) tree[r.nav_level1] = {};
+    const l2 = r.nav_level2 || "";
+    if (!tree[r.nav_level1][l2]) tree[r.nav_level1][l2] = { n: 0, l3s: {} };
+    tree[r.nav_level1][l2].n += r.n;
+    if (r.nav_level3) tree[r.nav_level1][l2].l3s[r.nav_level3] = r.n;
+  });
+
+  const container = document.getElementById("bc-tree");
+  container.innerHTML = "";
+
+  for (const [l1, l2map] of Object.entries(tree).sort()) {
+    const l1cnt = Object.values(l2map).reduce((a, v) => a + v.n, 0);
+    const wrap = document.createElement("div");
+    wrap.className = "bc-l1-wrap";
+
+    const l1btn = document.createElement("button");
+    l1btn.className = "bc-l1-btn";
+    l1btn.dataset.l1 = l1;
+    l1btn.innerHTML = `
+      <span class="arrow">▶</span>
+      <span class="bc-l1-dot"></span>
+      <span style="flex:1;text-align:left">${esc(l1)}</span>
+      <span class="bc-cnt">${l1cnt}</span>`;
+    l1btn.onclick = () => {
+      const isOpen = l1btn.classList.contains("open");
+      if (!isOpen) l1btn.classList.add("open");
+      // Toggle selection
+      if (filterNav1 === l1 && !filterNav2) {
+        clearNavFilter(); return;
+      }
+      setNavFilter(l1, null, null);
+    };
+
+    const l2list = document.createElement("div");
+    l2list.className = "bc-l2-list";
+
+    for (const [l2, { n: l2n, l3s }] of Object.entries(l2map).sort()) {
+      const l2wrap = document.createElement("div");
+      l2wrap.className = "bc-l2-wrap";
+
+      const hasL3 = Object.keys(l3s).length > 0;
+      const l2btn = document.createElement("button");
+      l2btn.className = "bc-l2-btn";
+      l2btn.dataset.l2 = l2;
+      if (l2) {
+        l2btn.innerHTML = `
+          ${hasL3 ? `<span class="arrow">▶</span>` : `<span style="width:9px"></span>`}
+          <span class="bc-l2-dot"></span>
+          <span style="flex:1;text-align:left">${esc(l2)}</span>
+          <span class="bc-cnt">${l2n}</span>`;
+        l2btn.onclick = () => {
+          if (hasL3 && !l2btn.classList.contains("open")) l2btn.classList.add("open");
+          if (filterNav1 === l1 && filterNav2 === l2 && !filterNav3) {
+            setNavFilter(l1, null, null); return;
+          }
+          setNavFilter(l1, l2, null);
+        };
+      }
+
+      const l3list = document.createElement("div");
+      l3list.className = "bc-l3-list";
+      for (const [l3, l3n] of Object.entries(l3s).sort()) {
+        const l3btn = document.createElement("button");
+        l3btn.className = "bc-l3-btn";
+        l3btn.dataset.l3 = l3;
+        l3btn.innerHTML = `
+          <span class="bc-l3-dot"></span>
+          <span style="flex:1;text-align:left">${esc(l3)}</span>
+          <span class="bc-cnt">${l3n}</span>`;
+        l3btn.onclick = () => {
+          if (filterNav1 === l1 && filterNav2 === l2 && filterNav3 === l3) {
+            setNavFilter(l1, l2, null); return;
+          }
+          setNavFilter(l1, l2, l3);
+        };
+        l3list.appendChild(l3btn);
+      }
+
+      if (l2) l2wrap.appendChild(l2btn);
+      if (hasL3) l2wrap.appendChild(l3list);
+      l2list.appendChild(l2wrap);
+    }
+
+    wrap.appendChild(l1btn);
+    wrap.appendChild(l2list);
+    container.appendChild(wrap);
+  }
+}
+
+function setNavFilter(l1, l2, l3) {
+  filterNav1 = l1; filterNav2 = l2; filterNav3 = l3;
+  refreshNavHighlight();
+  runQuery();
+}
+function clearNavFilter() {
+  filterNav1 = filterNav2 = filterNav3 = null;
+  refreshNavHighlight();
+  runQuery();
+}
+function refreshNavHighlight() {
+  document.querySelectorAll(".bc-l1-btn").forEach(b => {
+    b.classList.remove("sel");
+    if (b.dataset.l1 === filterNav1) b.classList.add("sel","open");
+  });
+  document.querySelectorAll(".bc-l2-btn").forEach(b => {
+    b.classList.remove("sel");
+    if (filterNav2 && b.dataset.l2 === filterNav2) b.classList.add("sel","open");
+  });
+  document.querySelectorAll(".bc-l3-btn").forEach(b => {
+    b.classList.remove("sel");
+    if (filterNav3 && b.dataset.l3 === filterNav3) b.classList.add("sel");
+  });
+}
+
+// ── SIDEBAR: VERSION TREE ─────────────────────────────────────────
+function buildVersionTree() {
+  const majors = Q(`
+    SELECT r.major_version,
+      (SELECT COUNT(*) FROM issue_versions iv
+       JOIN issues i ON i.id=iv.issue_id
+       WHERE iv.release_id IN (SELECT id FROM releases WHERE major_version=r.major_version)) as n
+    FROM releases r GROUP BY r.major_version
+    ORDER BY
+      CASE WHEN CAST(substr(r.major_version,1,4) AS INTEGER)>=2025
+        THEN CAST(substr(r.major_version,1,4)*100+CAST(COALESCE(NULLIF(substr(r.major_version,6),''),0) AS INTEGER) AS INTEGER)
+        ELSE CAST(replace(r.major_version,'.','') AS INTEGER)
+      END DESC`);
+
+  const container = document.getElementById("v-tree");
+  container.innerHTML = "";
+
+  for (const { major_version } of majors) {
+    const patches = Q(`
+      SELECT patch_version, release_date,
+        (SELECT COUNT(*) FROM issue_versions iv WHERE iv.release_id=r.id) as n
+      FROM releases r WHERE major_version=?
+      ORDER BY release_date DESC`, [major_version]);
+
+    const majBtn = document.createElement("button");
+    majBtn.className = "v-maj-btn";
+    majBtn.innerHTML = `<span class="arrow">▶</span><span style="flex:1;text-align:left">${esc(major_version)}</span>`;
+    majBtn.onclick = () => majBtn.classList.toggle("open");
+
+    const pList = document.createElement("div");
+    pList.className = "v-patches";
+    for (const p of patches) {
+      const pb = document.createElement("button");
+      pb.className = "v-patch-btn";
+      pb.dataset.version = p.patch_version;
+      pb.innerHTML = `<span>${esc(p.patch_version)}</span><span class="bc-cnt">${p.n}</span>`;
+      pb.onclick = () => {
+        if (filterVersion === p.patch_version) { filterVersion = null; pb.classList.remove("sel"); }
+        else {
+          document.querySelectorAll(".v-patch-btn").forEach(b => b.classList.remove("sel"));
+          filterVersion = p.patch_version; pb.classList.add("sel");
+        }
+        runQuery();
+      };
+      pList.appendChild(pb);
+    }
+    container.appendChild(majBtn);
+    container.appendChild(pList);
+  }
+}
+
+// ── COUNTS ───────────────────────────────────────────────────────
+function updateCounts() {
+  const rows = Q(`SELECT type, COUNT(DISTINCT id) n FROM issues GROUP BY type`);
+  let total = 0;
+  rows.forEach(r => {
+    const el = document.getElementById(`cnt-${r.type}`);
+    if (el) el.textContent = r.n;
+    total += r.n;
+  });
+  document.getElementById("cnt-all").textContent = total;
+
+  const ported = Q1(`
+    SELECT COUNT(*) n FROM (
+      SELECT i.id FROM issues i JOIN issue_versions iv ON i.id=iv.issue_id
+      WHERE i.defect_number IS NOT NULL GROUP BY i.id HAVING COUNT(*)>1)`);
+  document.getElementById("cnt-ported").textContent = ported ? ported.n : 0;
+
+  document.getElementById("statsbar").innerHTML =
+    `<b>${total}</b> issues · <b>${rows.length}</b> types · <b>${ported?ported.n:0}</b> ported`;
+}
+
+// ── QUERY ─────────────────────────────────────────────────────────
+function runQuery() {
+  const conds = [], ftsParams = [], restParams = [];
+
+  if (filterType !== "all" && filterType !== "ported") {
+    conds.push("i.type=?"); restParams.push(filterType);
+  }
+  if (filterType === "ported") {
+    conds.push("(SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1");
+    conds.push("i.defect_number IS NOT NULL");
+  }
+  if (filterVersion) { conds.push("r.patch_version=?"); restParams.push(filterVersion); }
+  if (filterNav1)    { conds.push("i.nav_level1=?");    restParams.push(filterNav1); }
+  if (filterNav2)    { conds.push("i.nav_level2=?");    restParams.push(filterNav2); }
+  if (filterNav3)    { conds.push("i.nav_level3=?");    restParams.push(filterNav3); }
+
+  let ftsJoin = "";
+  if (searchQ.trim()) {
+    const q = searchQ.trim().replace(/['"]/g, "");
+    ftsJoin = `JOIN issues_fts ON issues_fts.rowid=i.id AND issues_fts MATCH ?`;
+    ftsParams.push(`"${q}"*`);
+  }
+
+  const where = conds.length ? `AND ${conds.join(" AND ")}` : "";
+  const allParams = [...ftsParams, ...restParams];
+
+  const sql = `
+    SELECT i.id, i.defect_number, i.type,
+           i.breadcrumb, i.nav_level1, i.nav_level2, i.nav_level3,
+           i.title, i.description,
+           r.patch_version, r.major_version, r.release_date, r.url AS release_url,
+           (SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id) AS version_count
+    FROM issues i ${ftsJoin}
+    JOIN issue_versions iv ON iv.issue_id=i.id
+    JOIN releases r ON r.id=iv.release_id
+    WHERE 1=1 ${where}
+    ORDER BY
+      CASE WHEN CAST(substr(r.major_version,1,4) AS INTEGER)>=2025
+        THEN 9999999-(CAST(substr(r.major_version,1,4) AS INTEGER)*100+CAST(COALESCE(NULLIF(substr(r.major_version,6),''),0) AS INTEGER))
+        ELSE 9999999-CAST(replace(r.major_version,'.','') AS INTEGER)
+      END ASC,
+      r.release_date DESC, i.type, i.nav_level1, i.nav_level2`;
+
+  try {
+    allRows = Q(sql, allParams);
+  } catch(e) {
+    // FTS fail fallback
+    allRows = Q(sql.replace(ftsJoin,""), restParams);
+  }
+
+  renderTable();
+  renderChips();
+  document.getElementById("rcnt").textContent =
+    `${allRows.length.toLocaleString()} result${allRows.length!==1?"s":""}`;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────
+const TYPE_LABEL = {defect:"Defect",enhancement:"Enhancement",regulatory:"Regulatory",security:"Security"};
+
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function hl(s,q){
+  if(!q||!s) return esc(s);
+  const e=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  return esc(s).replace(new RegExp(`(${e})`,"gi"),"<mark>$1</mark>");
+}
+function fmtDate(d){
+  if(!d) return "—";
+  const [y,m,day]=d.split("-");
+  return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]} ${+day} ${y}`;
+}
+
+function bcHtml(l1,l2,l3,q){
+  let h = "";
+  if(l1) h += `<span class="bc-seg l1">${hl(l1,q)}</span>`;
+  if(l2) h += `<span class="bc-arrow">›</span><span class="bc-seg l2">${hl(l2,q)}</span>`;
+  if(l3) h += `<span class="bc-arrow">›</span><span class="bc-seg l3">${hl(l3,q)}</span>`;
+  return `<div class="bc-cell">${h}</div>`;
+}
+
+function renderTable(){
+  const tbody = document.getElementById("tbody");
+  expandedIdx = null;
+  const q = searchQ.trim();
+
+  if(!allRows.length){
+    document.getElementById("tbl").style.display="none";
+    document.getElementById("empty").style.display="flex";
+    return;
+  }
+  document.getElementById("tbl").style.display="";
+  document.getElementById("empty").style.display="none";
+
+  let html = "";
+  allRows.forEach((r,i) => {
+    const ported = r.version_count > 1;
+    html += `
+      <tr data-idx="${i}" onclick="toggleDetail(${i})">
+        <td><span class="vbadge">${esc(r.patch_version)}</span></td>
+        <td><span class="tbadge ${r.type}">${TYPE_LABEL[r.type]||r.type}</span></td>
+        <td>${bcHtml(r.nav_level1,r.nav_level2,r.nav_level3,q)}</td>
+        <td>${r.defect_number?`<span class="dnum">#${r.defect_number}</span>`:""}${hl(r.title,q)}</td>
+        <td>${ported?`<span class="pbadge">⇢ ${r.version_count}</span>`:`<span style="color:var(--dim);font-family:var(--mono);font-size:.65rem">—</span>`}</td>
+        <td style="font-family:var(--mono);font-size:.65rem;color:var(--dim)">${fmtDate(r.release_date)}</td>
+      </tr>
+      <tr class="detail-row" id="det-${i}" style="display:none"><td colspan="6"></td></tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function toggleDetail(idx){
+  const det = document.getElementById(`det-${idx}`);
+  const mainRow = document.querySelector(`tr[data-idx="${idx}"]`);
+  if(expandedIdx===idx){
+    det.style.display="none"; mainRow.classList.remove("exp"); expandedIdx=null; return;
+  }
+  if(expandedIdx!==null){
+    const pd=document.getElementById(`det-${expandedIdx}`);
+    const pm=document.querySelector(`tr[data-idx="${expandedIdx}"]`);
+    if(pd) pd.style.display="none"; if(pm) pm.classList.remove("exp");
+  }
+  expandedIdx=idx; mainRow.classList.add("exp"); det.style.display="";
+
+  const r = allRows[idx];
+  const versions = Q(`
+    SELECT r.patch_version, r.release_date
+    FROM releases r JOIN issue_versions iv ON iv.release_id=r.id
+    WHERE iv.issue_id=? ORDER BY r.release_date DESC`, [r.id]);
+
+  const chainHtml = versions.map(v =>
+    `<span class="vc-item${v.patch_version===r.patch_version?" cur":""}">${esc(v.patch_version)}</span>`
+  ).join(`<span style="color:var(--dim);font-size:.6rem;margin:0 1px">→</span>`);
+
+  // Breadcrumb in detail
+  let bcDetail = "";
+  if(r.nav_level1) bcDetail += `<span class="bc-seg l1">${esc(r.nav_level1)}</span>`;
+  if(r.nav_level2) bcDetail += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bc-seg l2">${esc(r.nav_level2)}</span>`;
+  if(r.nav_level3) bcDetail += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bc-seg l3">${esc(r.nav_level3)}</span>`;
+
+  det.querySelector("td").innerHTML = `
+    <div class="detail-inner">
+      ${bcDetail?`<div class="d-breadcrumb bc-cell" style="margin-bottom:10px">${bcDetail}</div>`:""}
+      <div class="d-meta">
+        ${r.defect_number?`<span><b>Defect #</b>${esc(r.defect_number)}</span>`:""}
+        <span><b>Type</b> ${TYPE_LABEL[r.type]||r.type}</span>
+        <span><b>Released</b> ${fmtDate(r.release_date)}</span>
+        ${r.version_count>1?`<span style="color:var(--ported)"><b>Ported</b> ${r.version_count} versions</span>`:""}
+        ${r.release_url?`<a href="${esc(r.release_url)}" target="_blank" rel="noopener"
+          style="font-family:var(--mono);font-size:.65rem">↗ Release Notes</a>`:""}
+      </div>
+      <div class="d-desc">${esc(r.description||r.title)}</div>
+      ${versions.length>1?`<div class="vc-lbl">VERSION HISTORY</div><div class="v-chain">${chainHtml}</div>`:""}
+    </div>`;
+}
+
+// ── CHIPS ─────────────────────────────────────────────────────────
+function renderChips(){
+  const c = document.getElementById("chips"); c.innerHTML="";
+  if(filterType!=="all"){
+    const col=filterType==="ported"?"--ported":`--${filterType}`;
+    addChip(c,TYPE_LABEL[filterType]||filterType,col,()=>{
+      filterType="all";
+      document.querySelectorAll(".tf").forEach(el=>el.classList.remove("act"));
+      document.querySelector('.tf[data-type="all"]').classList.add("act");
+      runQuery();
+    });
+  }
+  if(filterNav1){
+    let label=filterNav1;
+    if(filterNav2) label+=` › ${filterNav2}`;
+    if(filterNav3) label+=` › ${filterNav3}`;
+    addChip(c,label,"--nav-l1",()=>{ clearNavFilter(); });
+  }
+  if(filterVersion){
+    addChip(c,`v${filterVersion}`,"--accent",()=>{
+      filterVersion=null;
+      document.querySelectorAll(".v-patch-btn").forEach(b=>b.classList.remove("sel"));
+      runQuery();
+    });
+  }
+  if(searchQ.trim()){
+    addChip(c,`"${searchQ.trim()}"`,"--med",()=>{
+      searchQ=""; document.getElementById("search").value=""; runQuery();
+    });
+  }
+}
+function addChip(parent,label,colorVar,onClick){
+  const ch=document.createElement("div");
+  ch.className="chip act";
+  ch.innerHTML=`<div class="cdot" style="background:var(${colorVar})"></div>${esc(label)}<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+  ch.onclick=onClick; parent.appendChild(ch);
+}
+
+// ── EVENTS ────────────────────────────────────────────────────────
+document.getElementById("search").addEventListener("input", e=>{
+  searchQ=e.target.value; runQuery();
+});
+document.querySelectorAll(".tf").forEach(el=>{
+  el.addEventListener("click",()=>{
+    document.querySelectorAll(".tf").forEach(x=>x.classList.remove("act"));
+    el.classList.add("act"); filterType=el.dataset.type; runQuery();
+  });
+});
+document.querySelectorAll("th.sortable").forEach(th=>{
+  th.addEventListener("click",()=>{
+    const col=th.dataset.col;
+    if(sortCol===col) sortDir=sortDir==="desc"?"asc":"desc";
+    else { sortCol=col; sortDir="desc"; }
+    document.querySelectorAll("th").forEach(t=>t.classList.remove("sort-asc","sort-desc"));
+    th.classList.add(sortDir==="desc"?"sort-desc":"sort-asc");
+    runQuery();
+  });
+});
+
+init();
+</script>
+</body>
+</html>
