@@ -434,6 +434,17 @@ _TITLE_PREFIX_RE = re.compile(
     re.I
 )
 
+# Common English stop words that are never valid module headings.
+# Guards is_plain_module from picking up sentence fragments like "The", "In", "and".
+_COMMON_WORDS_RE = re.compile(
+    r"^(the|in|or|and|a|an|it|to|for|with|by|on|at|from|of|"
+    r"this|that|these|those|its|but|if|as|all|any|both|each)$",
+    re.I,
+)
+
+# Color applied to breadcrumb headings in newer (2024+) Deltek release notes pages.
+_BC_COLOR = "#0069aa"
+
 # Backwards-compatible alias (used in tests)
 _MAX_MODULE_NAME_WORDS = max(_SECTION_WORD_LIMIT.values())
 
@@ -463,7 +474,30 @@ def clean_text(t: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
+def _normalize_sep(text: str) -> str:
+    """Normalize breadcrumb path separators to '>>' before parsing.
+
+    Older pages use » (U+00BB) or its Latin-1 misread Â», and some use a
+    lone > with spaces.  All are collapsed to the canonical ' >> ' form.
+    """
+    text = text.replace("Â»", ">>").replace("\u00bb", ">>")
+    # lone > that isn't already part of >> (negative look-around)
+    text = re.sub(r"(?<!>)\s*>\s*(?!>)", " >> ", text)
+    return text
+
+
+def _has_breadcrumb_color(tag) -> bool:
+    """Return True if tag or any ancestor carries the breadcrumb font color."""
+    current = tag
+    while current and hasattr(current, "name"):
+        if _BC_COLOR in (current.get("style") or "").lower():
+            return True
+        current = current.parent
+    return False
+
+
 def parse_breadcrumb(raw: str) -> tuple[str, str, str, str]:
+    raw = _normalize_sep(raw)
     parts = [p.strip() for p in BREADCRUMB_SEP_RE.split(raw.strip())]
     l1 = parts[0] if len(parts) > 0 else ""
     l2 = parts[1] if len(parts) > 1 else ""
@@ -575,7 +609,9 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
             #   "Electronically Sign Timesheet Submissions" → title (not module)
             #   "New API Endpoint for Report Generation"   → title (not module)
             bold        = tag.find(["strong", "b"])
-            has_sep     = ">>" in text
+            norm_text   = _normalize_sep(text)
+            has_sep     = ">>" in norm_text
+            has_color   = _has_breadcrumb_color(tag)
             word_count  = len(text.split())
             word_limit  = _SECTION_WORD_LIMIT.get(current_section, 0)
             is_heading_only = (
@@ -593,6 +629,8 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 and word_count <= word_limit
                 and not is_title_prefix
                 and text[-1:] not in ".!?"
+                and text[:1].isupper()
+                and not _COMMON_WORDS_RE.match(text)
                 and not re.match(
                     r"^(Last Updated|Release Date|Welcome|These release|"
                     r"For more|Skip the|The following|If you)", text, re.I
@@ -601,11 +639,12 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
 
             if not DEFECT_RE.match(text) and (
                 has_sep
+                or has_color
                 or (is_heading_only and looks_like_module)
                 or is_plain_module
             ):
-                if has_sep:
-                    bc, l1, l2, l3 = parse_breadcrumb(text)
+                if has_sep or has_color:
+                    bc, l1, l2, l3 = parse_breadcrumb(norm_text)
                     if l1:
                         breadcrumb, nav1, nav2, nav3 = bc, l1, l2, l3
                 else:

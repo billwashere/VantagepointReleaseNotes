@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scraper"))
 
 from scraper import parse_html, make_issue_key, make_desc_hash, make_content_hash, _diff, DEFECT_RE, _MAX_MODULE_NAME_WORDS, _nav_for_section, SECTION_NAV_LABEL, SECTION_PATTERNS, PAGE_LAST_UPDATED_RE
-from scraper import parse_date
+from scraper import parse_date, _normalize_sep, _has_breadcrumb_color, parse_breadcrumb
 
 
 # ---------------------------------------------------------------------------
@@ -688,6 +688,111 @@ def test_page_last_updated_embedded_with_release_date():
 
 
 # ---------------------------------------------------------------------------
+# Separator normalization & font-color breadcrumb detection
+# ---------------------------------------------------------------------------
+
+def test_normalize_sep_right_angle_quote():
+    """» (U+00BB) separator is converted to >>."""
+    assert _normalize_sep("Settings \u00bb Security \u00bb Roles") == "Settings >> Security >> Roles"
+
+
+def test_normalize_sep_mangled_utf8():
+    """Â» (Latin-1 misread of ») is converted to >>."""
+    assert _normalize_sep("Billing Â» Interactive Billing") == "Billing >> Interactive Billing"
+
+
+def test_normalize_sep_single_arrow():
+    """Lone > with spaces is converted to >>."""
+    result = _normalize_sep("Hubs > Projects")
+    assert ">>" in result
+
+
+def test_parse_breadcrumb_right_angle_quote():
+    """parse_breadcrumb splits on » separator correctly."""
+    bc, l1, l2, l3 = parse_breadcrumb("Settings \u00bb Security \u00bb Roles")
+    assert l1 == "Settings"
+    assert l2 == "Security"
+    assert l3 == "Roles"
+    assert bc == "Settings >> Security >> Roles"
+
+
+def test_parse_breadcrumb_mangled_sep():
+    """parse_breadcrumb handles Â» mangled separator."""
+    bc, l1, l2, l3 = parse_breadcrumb("Billing Â» Interactive Billing")
+    assert l1 == "Billing"
+    assert l2 == "Interactive Billing"
+    assert bc == "Billing >> Interactive Billing"
+
+
+def test_breadcrumb_color_detected_in_inline_style():
+    """_has_breadcrumb_color returns True when tag has color:#0069aa style."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup('<p style="color:#0069AA">Settings</p>', "html.parser")
+    tag = soup.find("p")
+    assert _has_breadcrumb_color(tag) is True
+
+
+def test_breadcrumb_color_detected_on_ancestor():
+    """_has_breadcrumb_color returns True when a parent carries the color."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup('<div style="color:#0069AA"><p><strong>Settings</strong></p></div>', "html.parser")
+    tag = soup.find("strong")
+    assert _has_breadcrumb_color(tag) is True
+
+
+def test_breadcrumb_color_not_detected_without_style():
+    """_has_breadcrumb_color returns False for plain uncolored tags."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup('<p><strong>Settings</strong></p>', "html.parser")
+    tag = soup.find("strong")
+    assert _has_breadcrumb_color(tag) is False
+
+
+def test_colored_breadcrumb_parsed_by_parser():
+    """Parser uses #0069AA color as breadcrumb signal on newer pages."""
+    html = """<html><body>
+    <p>Enhancements</p>
+    <p><strong style="color:#0069AA">Billing &gt;&gt; Interactive Billing</strong></p>
+    <p><strong>Allow Editing of Posted Transactions</strong></p>
+    <p>You can now edit posted transactions directly without reversing them.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert issues[0]["nav_level1"] == "Billing"
+    assert issues[0]["nav_level2"] == "Interactive Billing"
+
+
+def test_word_fragments_not_breadcrumbs():
+    """Common English words and punctuation are never treated as module headings."""
+    for fragment in ["and", "or", "The", "In", ":", ","]:
+        html = f"""<html><body>
+        <p>Enhancements</p>
+        <p>{fragment}</p>
+        <p><strong>Allow Editing of Posted Transactions</strong></p>
+        <p>You can now edit posted transactions directly without reversing them.</p>
+        </body></html>"""
+        issues, _ = parse_html(html)
+        for issue in issues:
+            assert issue.get("nav_level1") != fragment, (
+                f"Fragment {fragment!r} must not become nav_level1"
+            )
+
+
+def test_right_angle_quote_breadcrumb_in_defect_section():
+    """» separator in defect section resolves to correct nav levels."""
+    html = """<html><body>
+    <p>Software Issues Resolved</p>
+    <p><strong>Settings \u00bb Security \u00bb Roles</strong></p>
+    <p>Defect 1234567: Cross-hub search now requires field level record security.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert issues[0]["nav_level1"] == "Settings"
+    assert issues[0]["nav_level2"] == "Security"
+    assert issues[0]["nav_level3"] == "Roles"
+
+
+# ---------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
@@ -738,6 +843,18 @@ if __name__ == "__main__":
         test_page_last_updated_no_comma,
         test_parse_date_normalises_variants,
         test_page_last_updated_embedded_with_release_date,
+        # Separator normalization & font-color breadcrumb detection
+        test_normalize_sep_right_angle_quote,
+        test_normalize_sep_mangled_utf8,
+        test_normalize_sep_single_arrow,
+        test_parse_breadcrumb_right_angle_quote,
+        test_parse_breadcrumb_mangled_sep,
+        test_breadcrumb_color_detected_in_inline_style,
+        test_breadcrumb_color_detected_on_ancestor,
+        test_breadcrumb_color_not_detected_without_style,
+        test_colored_breadcrumb_parsed_by_parser,
+        test_word_fragments_not_breadcrumbs,
+        test_right_angle_quote_breadcrumb_in_defect_section,
     ]
     passed = failed = 0
     for t in tests:
