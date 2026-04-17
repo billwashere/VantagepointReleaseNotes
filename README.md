@@ -1,148 +1,226 @@
 # Deltek Vantagepoint Release Notes Explorer
 
-A static website that lets you search and filter all Deltek Vantagepoint release notes — defects, enhancements, and regulatory changes — across every version since 2.0. Runs entirely in the browser using SQL.js (SQLite compiled to WebAssembly).
+A self-updating static website that lets you search and browse all Deltek Vantagepoint release notes — defects, enhancements, regulatory changes, and security updates — across every version from 2.0 onward. Runs entirely in the browser using SQLite compiled to WebAssembly. No server required after the initial download.
 
-## ✨ Features
+**Live demo:** deploy to GitHub Pages (see below).
 
-- 🔍 **Full-text search** across titles and descriptions
-- 🏷️ **Filter by type**: Defects · Enhancements · Regulatory · Security
-- 📦 **Filter by version**: Drill down to any patch release
-- 🔀 **Ported defect detection**: See which defects were backported across multiple versions
-- 🗂️ **Expandable rows**: Click any row to see the full description and version history
-- 🗃️ **Zero backend**: The entire SQLite database is served as a static file
+---
 
-## 🚀 Quick Start
+## Features
 
-### Option A — Use the demo database (no scraping needed)
+| | |
+|---|---|
+| 🔍 **Full-text search** | Debounced, non-blocking — queries run in a Web Worker |
+| 🏷️ **Filter by type** | Defects · Enhancements · Regulatory · Security · Ported Defects |
+| 🗂️ **Application Area tree** | Three-level drill-down matching the in-app navigation breadcrumbs |
+| 🔀 **Ported defect detection** | Same defect number across multiple versions → "⇢ N versions" badge |
+| 📦 **Filter by version** | Drill into any patch release |
+| 📄 **Paginated results** | 250 rows/page — no DOM storm on large result sets |
+| ⬇️ **Streaming download** | Progress bar during initial DB load, main thread never blocked |
+| 🌑 **Dark theme** | |
+
+### Application Area hierarchy
+
+Breadcrumbs are parsed directly from the release notes pages and stored as three nav levels:
+
+| Level | Example |
+|---|---|
+| nav_level1 | `Hubs` · `Billing` · `My Stuff` · `Transaction Center` |
+| nav_level2 | `Projects` · `Interactive Billing` · `Reporting` |
+| nav_level3 | `Planning` · `AP Vouchers` |
+
+**Regulatory and Security** issues are grouped under synthetic top-level nodes (`Regulatory`, `Security`) so that jurisdiction names (`Federal`, `California`, `Payroll`) don't pollute the Application Area sidebar alongside app module names.
+
+```
+Application Area
+├── Billing
+│   ├── Batch Billing
+│   └── Interactive Billing
+├── Hubs
+│   └── Projects
+│       ├── Planning
+│       └── Project
+├── Regulatory          ← all regulatory items grouped here
+│   ├── Federal
+│   └── Payroll
+│       ├── California
+│       └── Federal
+└── Security            ← all security items grouped here
+    └── API
+```
+
+---
+
+## Quick start
+
+### Run locally (demo data — no scraping needed)
 
 ```bash
 git clone https://github.com/YOUR_USER/vantagepoint-release-notes.git
 cd vantagepoint-release-notes
 
-# Install dependencies
-pip install requests beautifulsoup4 lxml
-
-# Seed with sample data from the pages we've already parsed
-python scraper/seed_demo.py
-
-# Copy db to web folder
+pip install -r scraper/requirements.txt
+python scraper/seed_demo.py       # populates db/release_notes.db with sample data
 cp db/release_notes.db web/
 
-# Serve locally (any static server will do)
-python -m http.server 8080 --directory web
-# → Open http://localhost:8080
+python serve.py                   # http://localhost:8001  (opens browser automatically)
 ```
 
-### Option B — Full scrape (gets all real data)
+> **Why `serve.py` instead of `python -m http.server`?**
+> Python's built-in HTTP server does not handle `Range:` requests — the progress bar works but shows no percentage. `serve.py` adds proper `206 Partial Content` support so the progress bar is accurate and local dev matches GitHub Pages behaviour exactly.
 
 ```bash
-# Scrape all versions (takes ~30–60 min, ~200+ pages)
+python serve.py 8080              # custom port
+python serve.py 8001 /path/to/web # custom port + directory
+```
+
+### Scrape all real data
+
+```bash
+# Full fresh scrape (all versions, ~30–60 min, ~200+ pages)
 python scraper/scraper.py
 
-# Or scrape specific versions only
+# Resume — skip old releases, always re-check last 10 (detects retroactive amendments)
+python scraper/scraper.py --resume --recheck 10
+
+# Only specific major versions
 python scraper/scraper.py --versions 7.0 2025.1
 
-# Resume a partially-completed scrape
-python scraper/scraper.py --resume
+# Preview without writing to DB
+python scraper/scraper.py --dry-run --versions 2025.1
 
-# Use a custom database path
-python scraper/scraper.py --db /path/to/my.db
+# All options
+python scraper/scraper.py --help
+```
 
-# Copy to web and serve
+After scraping:
+```bash
 cp db/release_notes.db web/
-python -m http.server 8080 --directory web
+python serve.py
 ```
 
-## 🌐 Deploy to GitHub Pages
+---
 
-### Manual setup
+## Deploy to GitHub Pages
 
-1. Fork / clone this repo
-2. Run the scraper and commit the database:
-   ```bash
-   python scraper/scraper.py
-   cp db/release_notes.db web/
-   git add web/release_notes.db
-   git commit -m "Add release notes database"
-   git push
-   ```
-3. In GitHub repo Settings → Pages:
-   - **Source**: Deploy from branch
-   - **Branch**: `gh-pages` (created automatically by the Action)
+### One-time setup
 
-### Automated weekly updates (GitHub Actions)
+1. Fork / push this repo to GitHub
+2. **Settings → Pages → Source:** set to "GitHub Actions"
+3. **Settings → Actions → General → Workflow permissions:** "Read and write permissions"
 
-The included workflow at `.github/workflows/scrape-deploy.yml` will:
-- Run every Monday at 06:00 UTC
-- Scrape any new release notes (uses `--resume` to skip already-scraped pages)
-- Deploy the updated site to GitHub Pages automatically
+The included workflow (`.github/workflows/scrape-deploy.yml`) will:
+- Run the parser unit tests first — deploy only if they pass
+- Scrape with `--resume --recheck 10 --concurrency 4` (fast on subsequent runs)
+- Deploy `web/` to the `gh-pages` branch
+- Repeat every Monday at 06:00 UTC
 
-Enable it by ensuring GitHub Actions has write permissions:
-1. Settings → Actions → General → Workflow permissions → "Read and write permissions"
-2. Settings → Pages → Source → "GitHub Actions"
+### Manual trigger
 
-## 🗃️ Database Schema
+Go to **Actions → Scrape & Deploy Release Notes → Run workflow**.
 
-```sql
-releases (
-    id, major_version, patch_version, build, release_date, url, scraped_at
-)
+---
 
-issues (
-    id, defect_number, type,      -- type: defect | enhancement | regulatory | security
-    category, subcategory,
-    title, description
-)
-
-issue_versions (
-    issue_id → issues.id,
-    release_id → releases.id
-    -- same issue linked to multiple releases = "ported"
-)
-
-issues_fts           -- FTS5 virtual table for fast full-text search
-```
-
-**Ported defects**: When the same defect number appears in multiple release rows, the UI shows a "⇢ N versions" badge and the detail panel shows the full version history.
-
-## 📋 Supported Versions
-
-| Range | Notes |
-|-------|-------|
-| 2.0 – 7.3 | Classic numeric versioning |
-| 2025.1 – 2026.2 | Quarterly calendar versioning |
-
-## 🛠️ Project Structure
+## Project structure
 
 ```
 ├── scraper/
-│   ├── scraper.py      # Full web scraper
-│   └── seed_demo.py    # Demo database seeder
+│   ├── scraper.py          Main scraper — fetch, parse, persist
+│   ├── seed_demo.py        Seed a working demo DB without network access
+│   └── requirements.txt    requests, beautifulsoup4, lxml, pytest
+├── tests/
+│   └── test_parser.py      30 offline unit tests for parse_html and utilities
 ├── web/
-│   ├── index.html      # Single-file static site (SQL.js)
-│   └── release_notes.db  # Generated SQLite database (gitignored by default)
-├── db/
-│   └── release_notes.db  # Working copy of database
-├── .github/
-│   └── workflows/
-│       └── scrape-deploy.yml
-└── README.md
+│   ├── index.html          Single-file static site (sql.js via Web Worker)
+│   └── release_notes.db    Generated SQLite database (committed for GH Pages)
+├── serve.py                Local dev server with HTTP Range request support
+└── .github/workflows/
+    └── scrape-deploy.yml   CI: test → scrape → deploy
 ```
 
-## ⚙️ Scraper Details
+---
 
-The scraper:
-1. Fetches each version's index page to discover all patch release URLs
-2. Fetches each individual `.htm` release note page
-3. Parses HTML to extract three section types:
-   - **Regulatory Enhancements**: Federal/state payroll and compliance changes
-   - **Enhancements**: New features organized by module
-   - **Software Issues Resolved**: Defect records with `Defect XXXXXX:` prefix
-4. Stores everything in SQLite with deduplication:
-   - Defects are globally unique by defect number (same defect backported = one row, multiple `issue_versions` links)
-   - Enhancements are deduplicated by title + category (a major feature described in multiple patch notes = one row)
-5. Respects the server with a 0.5s delay between requests
+## How the scraper works
 
-## 📝 License
+### Version discovery
 
-This project is a community tool. The underlying release note content is © Deltek Inc.
+The scraper fetches the Deltek master index at:
+```
+https://help.deltek.com/product/Vantagepoint/ReleaseNotes/
+```
+All version-specific index URLs are extracted from this page automatically. New versions (e.g. `2026.3`) are picked up on the next weekly run with no code changes. A hardcoded fallback list is used if the master page is unreachable.
+
+### Resume and change detection
+
+```
+All releases sorted newest-first
+├── Last N releases (--recheck N, default 5) → always re-fetched
+│   ├── content_hash unchanged → update timestamp only, skip DB write
+│   └── content_hash changed  → re-upsert all issues, record diff
+│       ├── added_keys   (new defect numbers on the page)
+│       ├── removed_keys (defect numbers no longer listed)
+│       └── modified_keys (same defect, description text amended)
+└── Older releases → skipped entirely
+```
+
+Every run appends a row to `scrape_history` so you have a complete audit trail of when each page changed and what changed in it.
+
+### Database schema
+
+```sql
+releases        -- one row per patch release (7.0.11, 2025.1.4, …)
+issues          -- one row per unique issue (defect, enhancement, regulatory, security)
+                -- issue_key: stable SHA-256 identity, excludes description
+                -- first_seen_at / updated_at: timestamps
+issue_versions  -- many-to-many: which releases contain which issue (ported defects)
+scrape_log      -- latest scrape state per URL (content_hash, page_last_updated)
+scrape_history  -- append-only audit: every scrape attempt, diffs as JSON arrays
+issues_fts      -- FTS5 virtual table for full-text search
+```
+
+### Parser design
+
+`parse_html(html: str)` is a pure function decoupled from HTTP — pass any HTML string to it. This makes it fully unit-testable without network access.
+
+Key parsing decisions:
+
+| Problem | Solution |
+|---|---|
+| `Defect1541790` (no space) consumed as breadcrumb | `DEFECT_RE` uses `\s*` not `\s+` |
+| Enhancement titles in `<p><strong>` mistaken for module names | `is_heading_only AND len ≤ 25 chars` threshold |
+| Enhancement title and description were emitted as two issues | `pending_title` buffer — bold title held until next plain paragraph |
+| Regulatory jurisdiction names (`Federal`, `California`) pollute Application Area | `_nav_for_section()` remaps to `Regulatory >> Federal` etc. |
+| Same defect number appearing twice on one page | Deduplication uses `make_issue_key()` (same hash as DB) |
+
+---
+
+## Running tests
+
+```bash
+# No pytest needed
+python tests/test_parser.py
+
+# With pytest
+pip install pytest
+pytest tests/ -v
+```
+
+Tests are offline — no network access required. The 30 tests cover:
+- `DEFECT_RE` matching (standard and no-space variants)
+- Breadcrumb parsing at all three levels
+- Enhancement title + description merging
+- Regulatory/Security nav remapping
+- `_nav_for_section()` all section types
+- `make_issue_key` stability across description changes
+- `make_content_hash` change detection
+- `_diff` add/remove/modify classification
+- Deduplication
+- `page_last_updated` extraction
+
+---
+
+## Notes
+
+- **Not affiliated with Deltek.** The underlying release note content is © Deltek Inc.
+- The scraper uses a 0.5 s delay between requests per worker. Please be respectful of Deltek's servers.
+- **Version 7.3** does not exist — Deltek skipped it. It is absent from the master index and from the scraper's fallback list.

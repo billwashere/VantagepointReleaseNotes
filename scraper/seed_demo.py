@@ -254,16 +254,30 @@ ISSUES = [
      ["2025.1.0"]),
 
     # Regulatory
-    ("regulatory", None, bc("Payroll >> Federal"),
+    ("regulatory", None, bc("Regulatory >> Payroll >> Federal"),
      "Federal Income Tax Withholding 2025 Updates",
      "The updates for federal income tax withholding effective January 1, 2025 include adjustments to the nonresident alien additional amounts and the percentage method tax brackets.",
      ["2025.1.1"]),
 
-    ("regulatory", None, bc("Payroll >> California"),
+    ("regulatory", None, bc("Regulatory >> Payroll >> California"),
      "California SB-1234 Supplemental Wage Reporting Update",
      "Updated payroll reporting to comply with California SB-1234 effective January 1, 2025, which changes reporting requirements for supplemental wages and bonus payments.",
      ["2025.1.0"]),
 ]
+
+
+def _release_url(major: str, patch: str) -> str:
+    """Generate the .htm URL for a patch release, matching Deltek's actual filename convention.
+
+    Deltek uses patch digits joined without separators:
+      7.0.11   → DeltekVantagepoint7011ReleaseNotes.htm
+      2025.1.4 → DeltekVantagepoint202514ReleaseNotes.htm
+    """
+    digits = patch.replace(".", "")
+    return (
+        f"https://help.deltek.com/product/Vantagepoint/{major}/ReleaseNotes/"
+        f"DeltekVantagepoint{digits}ReleaseNotes.htm"
+    )
 
 
 def seed(db_path: Path = DB_PATH):
@@ -275,12 +289,15 @@ def seed(db_path: Path = DB_PATH):
     conn = get_db(db_path)   # runs full SCHEMA including indexes
 
     release_id_map = {}
+    release_url_map = {}
     for major, patch, build, date in RELEASES:
+        url = _release_url(major, patch)
+        release_url_map[patch] = url
         conn.execute(
             """INSERT OR REPLACE INTO releases
-               (major_version, patch_version, build, release_date, scraped_at)
-               VALUES (?,?,?,?,datetime('now'))""",
-            (major, patch, build, date),
+               (major_version, patch_version, build, release_date, url, scraped_at)
+               VALUES (?,?,?,?,?,datetime('now'))""",
+            (major, patch, build, date, url),
         )
         conn.commit()
         row = conn.execute("SELECT id FROM releases WHERE patch_version=?", (patch,)).fetchone()
@@ -335,9 +352,9 @@ def seed(db_path: Path = DB_PATH):
         for v in versions:
             release_issues.setdefault(v, []).append((issue_type, defect_num, bc_full, title, description))
 
-    # All releases scraped initially
+    # Seed scrape_log + scrape_history (initial scrape — no changes)
     for major, patch, build, date in RELEASES:
-        url = f"https://help.deltek.com/product/Vantagepoint/{major}/ReleaseNotes/DeltekVantagepoint{patch.replace('.','')[:8]}ReleaseNotes.htm"
+        url = release_url_map[patch]
         issues_for_rel = release_issues.get(patch, [])
         c_hash = fp(issues_for_rel)
         conn.execute(
@@ -354,24 +371,50 @@ def seed(db_path: Path = DB_PATH):
             (url, f"{date}T06:00:00", date, "ok", len(issues_for_rel), c_hash)
         )
 
-    # Simulate a re-check where 2025.1.4 was amended: 2 new defects added
-    amended_url = "https://help.deltek.com/product/Vantagepoint/2025.1/ReleaseNotes/DeltekVantagepoint2025141ReleaseNotes.htm"
+    # Simulate three subsequent change events for realism
+    # 1. 2025.1.4 was amended 8 days later: 2 defects added, 1 description modified
+    url_2025_1_4 = release_url_map["2025.1.4"]
     conn.execute(
         """INSERT OR REPLACE INTO scrape_log
            (url, status, scraped_at, page_last_updated, content_hash, issue_count)
            VALUES (?,?,?,?,?,?)""",
-        (amended_url, "ok", "2025-05-20T06:00:00", "2025-05-20",
-         "abc123def456abc1", 13)
+        (url_2025_1_4, "ok", "2025-05-20T06:00:00", "2025-05-20", "abc123def456abc1", 13)
     )
     conn.execute(
         """INSERT INTO scrape_history
            (url, scraped_at, page_last_updated, status, issue_count, content_hash,
             changed, added_keys, removed_keys, modified_keys)
            VALUES (?,?,?,?,?,?,1,?,?,?)""",
-        (amended_url, "2025-05-20T06:00:00", "2025-05-20", "ok", 13, "abc123def456abc1",
+        (url_2025_1_4, "2025-05-20T06:00:00", "2025-05-20", "ok", 13, "abc123def456abc1",
          json.dumps(["D2384001", "D2384215"]),
          json.dumps([]),
          json.dumps(["D2371844"]))
+    )
+
+    # 2. 2025.1.2 was amended: 1 defect removed (duplicate found)
+    url_2025_1_2 = release_url_map["2025.1.2"]
+    conn.execute(
+        """INSERT INTO scrape_history
+           (url, scraped_at, page_last_updated, status, issue_count, content_hash,
+            changed, added_keys, removed_keys, modified_keys)
+           VALUES (?,?,?,?,?,?,1,?,?,?)""",
+        (url_2025_1_2, "2025-03-15T06:00:00", "2025-03-15", "ok", 3, "def456abc123def4",
+         json.dumps([]),
+         json.dumps(["D2099001"]),
+         json.dumps([]))
+    )
+
+    # 3. 7.0.10 was amended: description updated on one defect
+    url_7_0_10 = release_url_map["7.0.10"]
+    conn.execute(
+        """INSERT INTO scrape_history
+           (url, scraped_at, page_last_updated, status, issue_count, content_hash,
+            changed, added_keys, removed_keys, modified_keys)
+           VALUES (?,?,?,?,?,?,1,?,?,?)""",
+        (url_7_0_10, "2025-02-03T06:00:00", "2025-01-20", "ok", 3, "789abc123def7891",
+         json.dumps([]),
+         json.dumps([]),
+         json.dumps(["D2091230"]))
     )
     conn.commit()
 

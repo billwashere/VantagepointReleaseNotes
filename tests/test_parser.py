@@ -15,7 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scraper"))
 
-from scraper import parse_html, make_issue_key, make_desc_hash, make_content_hash, _diff, DEFECT_RE, _MAX_SINGLE_LEVEL_BC
+from scraper import parse_html, make_issue_key, make_desc_hash, make_content_hash, _diff, DEFECT_RE, _MAX_MODULE_NAME_WORDS, _nav_for_section, SECTION_NAV_LABEL, SECTION_PATTERNS, PAGE_LAST_UPDATED_RE
+from scraper import parse_date
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +117,7 @@ def test_regulatory_title_not_breadcrumb():
     """
     A long bold regulatory title like 'Federal Income Tax Withholding 2025 Updates'
     must NOT overwrite the module breadcrumb ('Federal').
+    Regulatory issues have nav_level1='Regulatory', nav_level2=jurisdiction.
     """
     html = """<html><body>
     <p>Regulatory Enhancements</p>
@@ -129,11 +131,18 @@ def test_regulatory_title_not_breadcrumb():
 
     assert len(issues) == 2, f"Expected 2 regulatory items, got {len(issues)}: {[i['title'] for i in issues]}"
     for i in issues:
-        assert i["nav_level1"] == "Federal", (
-            f"nav_level1 must be 'Federal', got {i['nav_level1']!r} for {i['title']!r}"
+        # nav_level1 is now the synthetic "Regulatory" grouping
+        assert i["nav_level1"] == "Regulatory", (
+            f"nav_level1 must be 'Regulatory', got {i['nav_level1']!r} for {i['title']!r}"
         )
-    assert_eq("title[0]", issues[0]["title"], "Federal Income Tax Withholding 2025 Updates")
-    assert_eq("title[1]", issues[1]["title"], "2021 Form W-2 Box 14 (Reporting COVID Leave Wages for Leave Provided in 2021)")
+        # nav_level2 holds the jurisdiction that was previously nav_level1
+        assert i["nav_level2"] == "Federal", (
+            f"nav_level2 must be 'Federal', got {i['nav_level2']!r} for {i['title']!r}"
+        )
+    assert_eq("breadcrumb[0]", issues[0]["breadcrumb"], "Regulatory >> Federal")
+    assert_eq("title[0]",      issues[0]["title"],      "Federal Income Tax Withholding 2025 Updates")
+    assert_eq("breadcrumb[1]", issues[1]["breadcrumb"], "Regulatory >> Federal")
+    assert_eq("title[1]",      issues[1]["title"],      "2021 Form W-2 Box 14 (Reporting COVID Leave Wages for Leave Provided in 2021)")
 
 
 def test_enhancement_title_not_breadcrumb():
@@ -203,14 +212,15 @@ def test_trailing_pending_title_flushed():
 def test_multiple_titles_each_get_own_description():
     """
     Multiple sequential bold titles must each get their own following description.
+    Uses actual Deltek title wording (6+ words, matching real pages like 2025.1).
     """
     html = """<html><body>
     <p>Enhancements</p>
     <p><strong>Timesheets</strong></p>
-    <p><strong>Electronically Sign Timesheet Submissions</strong></p>
+    <p><strong>Electronically Sign or Certify Timesheet Submissions</strong></p>
     <p>Employees can now sign timesheets by clicking a checkbox instead of entering a password.</p>
     <p><strong>My Stuff</strong></p>
-    <p><strong>Electronically Sign Expense Report Submissions</strong></p>
+    <p><strong>Electronically Sign or Certify Expense Report Submissions</strong></p>
     <p>Administrators can require electronic signatures on expense reports for compliance.</p>
     </body></html>"""
     issues, _ = parse_html(html)
@@ -278,11 +288,11 @@ def test_long_module_name_with_sep_is_breadcrumb():
     assert issues[0]["nav_level2"] == "Resource View"
 
 
-def test_max_single_level_bc_constant():
-    """_MAX_SINGLE_LEVEL_BC must be 25 or less — if raised it risks title regression."""
-    assert _MAX_SINGLE_LEVEL_BC <= 25, (
-        f"_MAX_SINGLE_LEVEL_BC={_MAX_SINGLE_LEVEL_BC} is too high; "
-        "raising it risks long enhancement titles becoming breadcrumbs"
+def test_max_module_name_words_constant():
+    """_MAX_MODULE_NAME_WORDS must be 6 or less — raising it risks long enhancement titles becoming breadcrumbs."""
+    assert _MAX_MODULE_NAME_WORDS <= 6, (
+        f"_MAX_MODULE_NAME_WORDS={_MAX_MODULE_NAME_WORDS} is too high; "
+        "module names have at most 5 words — keep buffer at 6"
     )
 
 
@@ -386,9 +396,299 @@ def test_diff_correctly_identifies_changes():
     assert len(added) == 1 and len(removed) == 1 and modified == []
 
 
+def test_long_module_name_is_breadcrumb_not_title():
+    """
+    Module names that exceed 25 chars but are ≤ 6 words must still become
+    breadcrumbs, not pending titles. Seen in real pages:
+      'Batch Billing and Interactive Billing' (5 words)
+      'Analysis Cubes for Vantagepoint Intelligence' (5 words)
+      'Billing and Draft Invoice Approvals' (5 words)
+    """
+    cases = [
+        "Batch Billing and Interactive Billing",
+        "Analysis Cubes for Vantagepoint Intelligence",
+        "Billing and Draft Invoice Approvals",
+        "Vantagepoint Connect for Gmail Tutorial",
+    ]
+    for module in cases:
+        html = f"""<html><body>
+        <p>Enhancements</p>
+        <p><strong>{module}</strong></p>
+        <p><strong>New Sub-Feature Title That Is Long Enough To Be A Title</strong></p>
+        <p>Description of the sub-feature goes here for testing purposes only.</p>
+        </body></html>"""
+        issues, _ = parse_html(html)
+        assert len(issues) == 1, (
+            f"Module {module!r}: expected 1 issue, got {len(issues)} — "
+            "module name must become breadcrumb, not pending title"
+        )
+        assert issues[0]["nav_level1"] == module, (
+            f"nav_level1 must be {module!r}, got {issues[0]['nav_level1']!r}"
+        )
+
+
+def test_plain_module_heading_older_page_format():
+    """
+    In older release note pages (2.0–4.x), module headings appear as plain
+    <p> tags (no <strong>), not <p><strong>. They must still become breadcrumbs.
+    """
+    html = """<html><body>
+    <p>Enhancements</p>
+    <p>Absence Year Utility</p>
+    <p>Absence Accrual Year Utility in the Browser Application: Vantagepoint now provides
+    an Absence Year utility in the browser application that enables you to open a new year.</p>
+    <p>AP Invoice Approvals</p>
+    <p>AP Invoice Approvals Grid has been improved with additional grid functionality columns.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 2, f"Expected 2 issues, got {len(issues)}"
+    assert issues[0]["nav_level1"] == "Absence Year Utility"
+    assert issues[1]["nav_level1"] == "AP Invoice Approvals"
+
+
+def test_section_alias_new_features():
+    """'New Features' heading (used in some older pages) must be treated as enhancement section."""
+    html = """<html><body>
+    <p>New Features</p>
+    <p><strong>Billing</strong></p>
+    <p>Invoice Download: You can now download invoices directly from the billing screen.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert issues[0]["type"] == "enhancement"
+    assert issues[0]["nav_level1"] == "Billing"
+
+
+def test_section_alias_new_features_and_enhancements():
+    """'New Features and Enhancements' heading must also be recognised."""
+    html = """<html><body>
+    <p>New Features and Enhancements</p>
+    <p><strong>API</strong></p>
+    <p>Expose new API endpoints for project data with proper authentication controls.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert issues[0]["type"] == "enhancement"
+
+
+def test_section_alias_issues_resolved():
+    """'Issues Resolved' (no 'Software' prefix, used in older pages) must be recognised."""
+    html = """<html><body>
+    <p>Issues Resolved</p>
+    <p><strong>Hubs &gt;&gt; Projects</strong></p>
+    <p>Defect 1111111: Project phase dates were not saved correctly when edited inline.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert issues[0]["type"] == "defect"
+    assert issues[0]["defect_number"] == "1111111"
+    assert issues[0]["nav_level1"] == "Hubs"
+
+
+def test_section_alias_resolved_issues():
+    """'Resolved Issues' (reversed word order) must also be recognised."""
+    html = """<html><body>
+    <p>Resolved Issues</p>
+    <p><strong>Billing &gt;&gt; Batch Billing</strong></p>
+    <p>Defect 2222222: Batch billing failed when projects had no billing terms set up.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert issues[0]["type"] == "defect"
+    assert issues[0]["defect_number"] == "2222222"
+
+
+def test_seven_word_title_is_not_breadcrumb():
+    """
+    An enhancement title with 7 words must NOT become a breadcrumb even if bold.
+    'New API Endpoint for Report Generation' = 7 words > _MAX_MODULE_NAME_WORDS.
+    """
+    html = """<html><body>
+    <p>Enhancements</p>
+    <p><strong>API</strong></p>
+    <p><strong>New API Endpoint for Report Generation</strong></p>
+    <p>API endpoints to run a report and receive a saved PDF are now available.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert_eq("nav_level1", issues[0]["nav_level1"], "API")
+    assert_eq("title", issues[0]["title"], "New API Endpoint for Report Generation")
+
+
 # ---------------------------------------------------------------------------
-# Standalone runner (no pytest needed)
+
+
+def test_nav_for_section_regulatory_shifts_jurisdiction_to_l2():
+    """Regulatory items: section label becomes nav1, jurisdiction shifts to nav2."""
+    bc, n1, n2, n3 = _nav_for_section("regulatory", "Federal", "", "")
+    assert_eq("nav1", n1, "Regulatory")
+    assert_eq("nav2", n2, "Federal")
+    assert_eq("nav3", n3, "")
+    assert_eq("breadcrumb", bc, "Regulatory >> Federal")
+
+
+def test_nav_for_section_regulatory_three_levels():
+    """Regulatory with sub-jurisdiction: all levels shift down correctly."""
+    bc, n1, n2, n3 = _nav_for_section("regulatory", "Payroll", "Federal", "")
+    assert_eq("nav1", n1, "Regulatory")
+    assert_eq("nav2", n2, "Payroll")
+    assert_eq("nav3", n3, "Federal")
+    assert_eq("breadcrumb", bc, "Regulatory >> Payroll >> Federal")
+
+
+def test_nav_for_section_security_shifts_to_l2():
+    """Security items: section label becomes nav1."""
+    bc, n1, n2, n3 = _nav_for_section("security", "API", "", "")
+    assert_eq("nav1", n1, "Security")
+    assert_eq("nav2", n2, "API")
+    assert_eq("breadcrumb", bc, "Security >> API")
+
+
+def test_nav_for_section_enhancement_unchanged():
+    """Enhancements pass through nav levels unchanged."""
+    bc, n1, n2, n3 = _nav_for_section("enhancement", "Billing", "Batch Billing", "")
+    assert_eq("nav1", n1, "Billing")
+    assert_eq("nav2", n2, "Batch Billing")
+    assert_eq("breadcrumb", bc, "Billing >> Batch Billing")
+
+
+def test_nav_for_section_defect_unchanged():
+    """Defects pass through nav levels unchanged."""
+    bc, n1, n2, n3 = _nav_for_section("defect", "Transaction Center", "Transaction Entry", "AP Vouchers")
+    assert_eq("nav1", n1, "Transaction Center")
+    assert_eq("nav2", n2, "Transaction Entry")
+    assert_eq("nav3", n3, "AP Vouchers")
+
+
+def test_security_issues_have_security_as_nav1():
+    """Parsed security issues must have nav_level1='Security'."""
+    html = """<html><body>
+    <p>Security Enhancements</p>
+    <p><strong>API</strong></p>
+    <p><strong>OAuth Token Expiry Now Enforced for All Sessions</strong></p>
+    <p>OAuth tokens now expire after the configured timeout period to improve security posture.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1
+    assert_eq("nav_level1", issues[0]["nav_level1"], "Security")
+    assert_eq("nav_level2", issues[0]["nav_level2"], "API")
+    assert_eq("breadcrumb", issues[0]["breadcrumb"], "Security >> API")
+
+
+def test_regulatory_issues_use_regulatory_nav1_not_jurisdiction():
+    """Parsed regulatory issues must group under 'Regulatory', not raw jurisdiction names."""
+    html = """<html><body>
+    <p>Regulatory Enhancements</p>
+    <p><strong>Federal</strong></p>
+    <p><strong>Federal Income Tax Withholding 2026 Updates</strong></p>
+    <p>Updated tables per IRS Notice effective January 1, 2026.</p>
+    <p><strong>California</strong></p>
+    <p><strong>California SDI Rate Update for 2026</strong></p>
+    <p>California updated its State Disability Insurance contribution rate for 2026.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 2
+    for i in issues:
+        assert i["nav_level1"] == "Regulatory", (
+            f"Expected Regulatory, got {i['nav_level1']!r} — jurisdiction names must not appear at nav1"
+        )
+    assert_eq("nav2[0]", issues[0]["nav_level2"], "Federal")
+    assert_eq("nav2[1]", issues[1]["nav_level2"], "California")
+    assert issues[0]["breadcrumb"] == "Regulatory >> Federal"
+    assert issues[1]["breadcrumb"] == "Regulatory >> California"
+
+
+def test_app_area_sidebar_not_polluted_by_regulatory():
+    """
+    In a page with both regulatory and defect sections, nav_level1 values for
+    regulatory must be 'Regulatory' — not 'Federal', 'Payroll', etc. —
+    so they don't pollute the Application Area sidebar.
+    """
+    html = """<html><body>
+    <p>Regulatory Enhancements</p>
+    <p><strong>Payroll</strong></p>
+    <p><strong>Social Security Wage Base Increase 2026</strong></p>
+    <p>The Social Security wage base increases to 180000 effective January 1, 2026.</p>
+    <p>Enhancements</p>
+    <p><strong>Hubs</strong></p>
+    <p>You can now add assignments to inactive WBS levels for better historical tracking purposes.</p>
+    <p>Software Issues Resolved</p>
+    <p><strong>My Stuff &gt;&gt; Reporting</strong></p>
+    <p>Defect 1234567: Budget Hours did not display when Project Planning Budget was selected.</p>
+    </body></html>"""
+    issues, _ = parse_html(html)
+
+    nav1_values = {i["nav_level1"] for i in issues}
+
+    # Must contain app module names and Regulatory
+    assert "Regulatory" in nav1_values
+    assert "Hubs" in nav1_values
+    assert "My Stuff" in nav1_values
+
+    # Must NOT contain raw jurisdiction names at nav1
+    contaminating = {"Federal", "Payroll", "State", "California", "FICA"}
+    assert not nav1_values & contaminating, (
+        f"Jurisdiction names leaked into nav_level1: {nav1_values & contaminating}"
+    )
+
+
 # ---------------------------------------------------------------------------
+# Date parsing — PAGE_LAST_UPDATED_RE and parse_date
+# ---------------------------------------------------------------------------
+
+def test_page_last_updated_normal():
+    """Standard 'Last Updated: Month D, YYYY' format."""
+    html = "<html><body><p>Last Updated: October 3, 2022</p></body></html>"
+    _, plu = parse_html(html)
+    assert_eq("plu", plu, "2022-10-03")
+
+
+def test_page_last_updated_space_before_comma():
+    """
+    '5.5.1 bug': 'Last Updated: October 3 , 2022' — space before comma.
+    Confirmed on DeltekVantagepoint551ReleaseNotes.htm
+    """
+    html = "<html><body><p>Last Updated: October 3 , 2022</p></body></html>"
+    _, plu = parse_html(html)
+    assert_eq("plu", plu, "2022-10-03")
+
+
+def test_page_last_updated_nbsp_before_comma():
+    """Non-breaking space (\\xa0) before comma — HTML &nbsp; decoded by the parser."""
+    html = "<html><body><p>Last Updated: October 3\xa0, 2022</p></body></html>"
+    _, plu = parse_html(html)
+    assert_eq("plu", plu, "2022-10-03")
+
+
+def test_page_last_updated_no_comma():
+    """Date with no comma at all: 'October 3 2022'."""
+    html = "<html><body><p>Last Updated: October 3 2022</p></body></html>"
+    _, plu = parse_html(html)
+    assert_eq("plu", plu, "2022-10-03")
+
+
+def test_parse_date_normalises_variants():
+    """parse_date handles all observed whitespace/comma variants."""
+    assert_eq("space before comma", parse_date("October 3 , 2022"),    "2022-10-03")
+    assert_eq("nbsp before comma",  parse_date("October 3\xa0, 2022"), "2022-10-03")
+    assert_eq("no comma",           parse_date("October 3 2022"),       "2022-10-03")
+    assert_eq("normal",             parse_date("October 3, 2022"),      "2022-10-03")
+    assert_eq("abbreviated month",  parse_date("Oct 3, 2022"),          "2022-10-03")
+    assert_eq("two-digit day",      parse_date("February 21, 2022"),    "2022-02-21")
+    assert_eq("month only",         parse_date("January 2025"),         "2025-01-01")
+    assert parse_date("") is None
+    assert parse_date("garbage text") is None
+
+
+def test_page_last_updated_embedded_with_release_date():
+    """Both dates on same line with space-before-comma on Last Updated — real 5.5.1 pattern."""
+    html = "<html><body><p>Release Date: October 3, 2022  Last Updated: October 3 , 2022</p></body></html>"
+    _, plu = parse_html(html)
+    assert_eq("plu", plu, "2022-10-03")
+
+
+# ---------------------------------------------------------------------------
+
 
 if __name__ == "__main__":
     tests = [
@@ -406,7 +706,7 @@ if __name__ == "__main__":
         test_two_level_breadcrumb,
         test_single_level_short_module_is_breadcrumb,
         test_long_module_name_with_sep_is_breadcrumb,
-        test_max_single_level_bc_constant,
+        test_max_module_name_words_constant,
         test_page_last_updated_extracted,
         test_page_last_updated_missing,
         test_duplicate_issues_on_page_deduplicated,
@@ -414,6 +714,30 @@ if __name__ == "__main__":
         test_content_hash_detects_description_change,
         test_content_hash_detects_new_issue,
         test_diff_correctly_identifies_changes,
+        # Breadcrumb threshold and older page formats
+        test_long_module_name_is_breadcrumb_not_title,
+        test_plain_module_heading_older_page_format,
+        test_section_alias_new_features,
+        test_section_alias_new_features_and_enhancements,
+        test_section_alias_issues_resolved,
+        test_section_alias_resolved_issues,
+        test_seven_word_title_is_not_breadcrumb,
+        # Nav remapping
+        test_nav_for_section_regulatory_shifts_jurisdiction_to_l2,
+        test_nav_for_section_regulatory_three_levels,
+        test_nav_for_section_security_shifts_to_l2,
+        test_nav_for_section_enhancement_unchanged,
+        test_nav_for_section_defect_unchanged,
+        test_security_issues_have_security_as_nav1,
+        test_regulatory_issues_use_regulatory_nav1_not_jurisdiction,
+        test_app_area_sidebar_not_polluted_by_regulatory,
+        # Date parsing
+        test_page_last_updated_normal,
+        test_page_last_updated_space_before_comma,
+        test_page_last_updated_nbsp_before_comma,
+        test_page_last_updated_no_comma,
+        test_parse_date_normalises_variants,
+        test_page_last_updated_embedded_with_release_date,
     ]
     passed = failed = 0
     for t in tests:

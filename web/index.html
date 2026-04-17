@@ -9,274 +9,395 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:        #0b0e14;
-  --bg2:       #111520;
-  --bg3:       #181d2b;
-  --border:    #1e2436;
-  --border2:   #252d42;
-  --text:      #c8d0e8;
-  --dim:       #5a6480;
-  --med:       #8b96b8;
-  --accent:    #3d9eff;
-  --accent-dim:#1a4a80;
-  --defect:    #ff5050;
-  --defect-bg: rgba(255,80,80,.08);
-  --enhance:   #38d986;
-  --enhance-bg:rgba(56,217,134,.08);
-  --reg:       #ffbe00;
-  --reg-bg:    rgba(255,190,0,.08);
-  --security:  #a78bfa;
-  --security-bg:rgba(167,139,250,.1);
-  --ported:    #ff9a3c;
-  --ported-bg: rgba(255,154,60,.08);
-  --nav-l1:    #60a5fa;
-  --nav-l2:    #a78bfa;
-  --nav-l3:    #34d399;
-  --mono: "IBM Plex Mono", monospace;
-  --sans: "Syne", sans-serif;
-  --r:    6px;
+  --bg:#0b0e14;--bg2:#111520;--bg3:#181d2b;
+  --bdr:#1e2436;--bdr2:#252d42;
+  --txt:#c8d0e8;--dim:#5a6480;--med:#8b96b8;
+  --acc:#3d9eff;--acc-dim:#1a4a80;
+  --def:#ff5050;--def-bg:rgba(255,80,80,.08);
+  --enh:#38d986;--enh-bg:rgba(56,217,134,.08);
+  --reg:#ffbe00;--reg-bg:rgba(255,190,0,.08);
+  --sec:#a78bfa;--sec-bg:rgba(167,139,250,.1);
+  --por:#ff9a3c;--por-bg:rgba(255,154,60,.08);
+  --l1:#60a5fa;--l2:#a78bfa;--l3:#34d399;
+  --mono:"IBM Plex Mono",monospace;
+  --sans:"Syne",sans-serif;
+  --r:6px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
 button{font-family:inherit;cursor:pointer;border:none;background:none}
 input{font-family:var(--mono)}
-a{color:var(--accent);text-decoration:none}
+a{color:var(--acc);text-decoration:none}
 a:hover{text-decoration:underline}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
 
 /* ── LAYOUT ── */
 #app{display:flex;flex-direction:column;height:100vh}
 
 /* TOP BAR */
 #topbar{display:flex;align-items:center;gap:14px;padding:0 18px;height:52px;
-  background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;z-index:20}
+  background:var(--bg2);border-bottom:1px solid var(--bdr);flex-shrink:0;z-index:20}
 .logo{font-weight:800;font-size:1rem;letter-spacing:-.01em;color:#fff;display:flex;align-items:center;gap:9px;white-space:nowrap}
-.logo span{color:var(--accent)}
+.logo span{color:var(--acc)}
 .logo-sq{display:grid;grid-template-columns:1fr 1fr;gap:2.5px;width:19px;height:19px}
-.logo-sq i{border-radius:2px;background:var(--accent)}
+.logo-sq i{border-radius:2px;background:var(--acc)}
 .logo-sq i:nth-child(2){opacity:.5}
 .logo-sq i:nth-child(3){opacity:.5}
 .logo-sq i:nth-child(4){opacity:.2}
-.vdiv{width:1px;height:22px;background:var(--border2)}
+.vdiv{width:1px;height:22px;background:var(--bdr2)}
 #search-wrap{flex:1;max-width:460px;position:relative}
-#search{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);
-  color:var(--text);padding:6px 11px 6px 33px;font-size:.82rem;outline:none;transition:border-color .15s}
-#search:focus{border-color:var(--accent)}
+#search{width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--txt);padding:6px 30px 6px 33px;font-size:.82rem;outline:none;transition:border-color .15s}
+#search:focus{border-color:var(--acc)}
 #search::placeholder{color:var(--dim)}
 .sico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--dim);pointer-events:none}
+#search-spinner{position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  display:none;width:12px;height:12px;border:1.5px solid var(--bdr2);
+  border-top-color:var(--acc);border-radius:50%;animation:spin .6s linear infinite}
 #statsbar{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--dim);white-space:nowrap}
 #statsbar b{color:var(--med)}
 
 /* BODY */
 #body{display:flex;flex:1;overflow:hidden}
 
-/* ── SIDEBAR ── */
-#sidebar{width:264px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
-  overflow-y:auto;padding:10px 0;display:flex;flex-direction:column;gap:0}
-.sb-section{padding-bottom:4px}
+/* SIDEBAR */
+#sidebar{width:264px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--bdr);
+  overflow-y:auto;padding:10px 0}
 .sb-label{padding:8px 14px 5px;font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;
   text-transform:uppercase;color:var(--dim)}
-
-/* Type filters */
 .tf{display:flex;align-items:center;gap:9px;padding:6px 14px;cursor:pointer;
   border-left:2px solid transparent;font-size:.82rem;transition:background .1s}
 .tf:hover{background:var(--bg3)}
-.tf.act{background:var(--bg3);border-left-color:var(--accent)}
+.tf.act{background:var(--bg3);border-left-color:var(--acc)}
 .tf .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .tf .cnt{margin-left:auto;font-family:var(--mono);font-size:.68rem;color:var(--dim)}
-
-/* Breadcrumb tree */
-.bc-tree{padding:0 8px}
-.bc-l1-wrap{margin-bottom:2px}
-.bc-l1-btn{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;
-  border-radius:var(--r);font-size:.78rem;color:var(--med);transition:background .1s,color .1s}
-.bc-l1-btn:hover{background:var(--bg3);color:var(--text)}
-.bc-l1-btn.sel{background:var(--bg3);color:var(--nav-l1)}
-.bc-l1-btn.sel .arrow{transform:rotate(90deg)}
-.arrow{font-size:.6rem;transition:transform .15s;flex-shrink:0;color:var(--dim)}
-.bc-l1-dot{width:6px;height:6px;border-radius:50%;background:var(--nav-l1);flex-shrink:0;opacity:.6}
-.bc-l2-list{display:none;padding-left:16px}
-.bc-l1-btn.open + .bc-l2-list{display:block}
-.bc-l2-wrap{margin-bottom:1px}
-.bc-l2-btn{display:flex;align-items:center;gap:6px;width:100%;padding:4px 8px;
-  border-radius:var(--r);font-size:.75rem;color:var(--dim);transition:background .1s,color .1s}
-.bc-l2-btn:hover{background:var(--bg3);color:var(--text)}
-.bc-l2-btn.sel{background:rgba(167,139,250,.08);color:var(--nav-l2)}
-.bc-l2-btn.sel .arrow{transform:rotate(90deg)}
-.bc-l2-dot{width:5px;height:5px;border-radius:50%;background:var(--nav-l2);flex-shrink:0;opacity:.6}
-.bc-l3-list{display:none;padding-left:14px}
-.bc-l2-btn.open + .bc-l3-list{display:block}
-.bc-l3-btn{display:flex;align-items:center;gap:5px;width:100%;padding:3px 8px;
-  border-radius:var(--r);font-family:var(--mono);font-size:.68rem;color:var(--dim);
-  transition:background .1s,color .1s}
-.bc-l3-btn:hover{background:var(--bg3);color:var(--text)}
-.bc-l3-btn.sel{background:rgba(52,211,153,.08);color:var(--nav-l3)}
-.bc-l3-dot{width:5px;height:5px;border-radius:50%;background:var(--nav-l3);flex-shrink:0;opacity:.6}
+.bc-tree,.v-tree{padding:0 6px}
+.l1-wrap{margin-bottom:2px}
+.l1-btn,.l2-btn,.l3-btn{display:flex;align-items:center;gap:5px;width:100%;
+  border-radius:4px;font-size:11.5px;color:var(--med);background:none;border:none;
+  font-family:var(--sans);cursor:pointer;transition:background .1s,color .1s}
+.l1-btn{padding:5px 7px}.l2-btn{padding:4px 7px}.l3-btn{padding:3px 7px}
+.l1-btn:hover,.l1-btn.sel,.l2-btn:hover,.l2-btn.sel,.l3-btn:hover,.l3-btn.sel{
+  background:var(--bg3);color:var(--txt)}
+.l1-btn.sel{color:var(--l1)}.l2-btn.sel{color:var(--l2)}.l3-btn.sel{color:var(--l3)}
+.arr{font-size:9px;transition:transform .15s;color:var(--dim);flex-shrink:0}
+.l1-btn.open .arr,.l2-btn.open .arr{transform:rotate(90deg)}
+.l1d{width:6px;height:6px;border-radius:50%;background:var(--l1);flex-shrink:0;opacity:.7}
+.l2d{width:5px;height:5px;border-radius:50%;background:var(--l2);flex-shrink:0;opacity:.7}
+.l3d{width:5px;height:5px;border-radius:50%;background:var(--l3);flex-shrink:0;opacity:.7}
+.l2-list{display:none;padding-left:15px}.l1-btn.open + .l2-list{display:block}
+.l3-list{display:none;padding-left:13px}.l2-btn.open + .l3-list{display:block}
 .bc-cnt{margin-left:auto;font-family:var(--mono);font-size:.65rem;color:var(--dim)}
-
-/* Version list */
-.v-tree{padding:0 8px}
 .v-maj-btn{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;
-  border-radius:var(--r);font-size:.78rem;color:var(--med);transition:background .1s,color .1s}
-.v-maj-btn:hover{background:var(--bg3);color:var(--text)}
-.v-maj-btn.open .arrow{transform:rotate(90deg)}
+  border-radius:var(--r);font-size:.78rem;color:var(--med);background:none;border:none;
+  font-family:var(--sans);cursor:pointer;transition:background .1s,color .1s}
+.v-maj-btn:hover{background:var(--bg3);color:var(--txt)}
+.v-maj-btn.open .arr{transform:rotate(90deg)}
 .v-patches{display:none;padding-left:16px}
 .v-maj-btn.open + .v-patches{display:block}
 .v-patch-btn{display:flex;align-items:center;justify-content:space-between;width:100%;
   padding:3px 8px;border-radius:var(--r);font-family:var(--mono);font-size:.72rem;
-  color:var(--dim);transition:background .1s,color .1s}
-.v-patch-btn:hover{background:var(--bg3);color:var(--text)}
-.v-patch-btn.sel{background:var(--accent-dim);color:var(--accent)}
+  color:var(--dim);background:none;border:none;cursor:pointer;transition:background .1s,color .1s}
+.v-patch-btn:hover{background:var(--bg3);color:var(--txt)}
+.v-patch-btn.sel{background:var(--acc-dim);color:var(--acc)}
 
-/* ── MAIN ── */
+/* MAIN */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-
-/* Toolbar */
 #toolbar{display:flex;align-items:center;gap:8px;padding:9px 14px;
-  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg);min-height:44px}
+  border-bottom:1px solid var(--bdr);flex-shrink:0;min-height:44px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
 .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;
-  font-family:var(--mono);font-size:.68rem;cursor:pointer;border:1px solid var(--border2);
-  color:var(--dim);background:var(--bg2);transition:all .12s}
-.chip:hover{border-color:var(--med)}
-.chip.act{border-color:var(--accent);color:var(--accent);background:rgba(61,158,255,.08)}
+  font-family:var(--mono);font-size:.68rem;cursor:pointer;border:1px solid var(--bdr2);
+  color:var(--dim);background:var(--bg2)}
+.chip.act{border-color:var(--acc);color:var(--acc);background:rgba(61,158,255,.08)}
+.chip.l1c{border-color:var(--l1);color:var(--l1);background:rgba(96,165,250,.08)}
 .chip .cdot{width:5px;height:5px;border-radius:50%}
 #rcnt{font-family:var(--mono);font-size:.68rem;color:var(--dim);white-space:nowrap}
 
-/* Table */
-#tbl-wrap{flex:1;overflow-y:auto}
+/* TABLE */
+#tbl-wrap{flex:1;overflow-y:auto;position:relative}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 thead{position:sticky;top:0;z-index:5}
-thead tr{background:var(--bg2);border-bottom:1px solid var(--border)}
+thead tr{background:var(--bg2);border-bottom:1px solid var(--bdr)}
 th{padding:9px 11px;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;
   text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;white-space:nowrap}
 th.sortable{cursor:pointer;user-select:none}
-th.sortable:hover{color:var(--text)}
+th.sortable:hover{color:var(--txt)}
 th.sort-asc::after{content:" ▲"}
 th.sort-desc::after{content:" ▼"}
-th:nth-child(1){width:108px}
-th:nth-child(2){width:100px}
-th:nth-child(3){width:auto}   /* breadcrumb */
-th:nth-child(4){width:auto}   /* title */
-th:nth-child(5){width:90px}
-th:nth-child(6){width:82px}
-tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background .08s}
+th:nth-child(1){width:108px}th:nth-child(2){width:100px}
+th:nth-child(3){width:auto}  /* App Area */
+th:nth-child(4){width:auto}  /* Title */
+th:nth-child(5){width:90px}th:nth-child(6){width:82px}
+tbody tr{border-bottom:1px solid var(--bdr);cursor:pointer;transition:background .08s}
 tbody tr:hover{background:var(--bg3)}
 tbody tr.exp{background:var(--bg3)}
 td{padding:9px 11px;font-size:.8rem;vertical-align:top;line-height:1.4}
-
-.vbadge{display:inline-block;background:var(--bg3);border:1px solid var(--border2);
+.vbadge{display:inline-block;background:var(--bg3);border:1px solid var(--bdr2);
   border-radius:4px;padding:2px 6px;font-family:var(--mono);font-size:.68rem;color:var(--med)}
-.tbadge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:3px;
+.tbadge{display:inline-flex;padding:2px 7px;border-radius:3px;
   font-family:var(--mono);font-size:.67rem;font-weight:500}
-.tbadge.defect     {background:var(--defect-bg);color:var(--defect)}
-.tbadge.enhancement{background:var(--enhance-bg);color:var(--enhance)}
-.tbadge.regulatory {background:var(--reg-bg);color:var(--reg)}
-.tbadge.security   {background:var(--security-bg);color:var(--security)}
-
-/* Breadcrumb display in table cell */
+.tbadge.defect{background:var(--def-bg);color:var(--def)}
+.tbadge.enhancement{background:var(--enh-bg);color:var(--enh)}
+.tbadge.regulatory{background:var(--reg-bg);color:var(--reg)}
+.tbadge.security{background:var(--sec-bg);color:var(--sec)}
 .bc-cell{display:flex;flex-wrap:wrap;align-items:center;gap:3px;font-family:var(--mono);font-size:.67rem}
-.bc-seg{padding:1px 5px;border-radius:3px}
-.bc-seg.l1{background:rgba(96,165,250,.1);color:var(--nav-l1)}
-.bc-seg.l2{background:rgba(167,139,250,.08);color:var(--nav-l2)}
-.bc-seg.l3{background:rgba(52,211,153,.08);color:var(--nav-l3)}
-.bc-arrow{color:var(--dim);font-size:.6rem}
-
+.bs1{padding:1px 4px;border-radius:3px;background:rgba(96,165,250,.1);color:var(--l1)}
+.bs2{padding:1px 4px;border-radius:3px;background:rgba(167,139,250,.08);color:var(--l2)}
+.bs3{padding:1px 4px;border-radius:3px;background:rgba(52,211,153,.08);color:var(--l3)}
+.ba{color:var(--dim);font-size:.6rem}
 .pbadge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;
-  font-family:var(--mono);font-size:.65rem;background:var(--ported-bg);color:var(--ported);
+  font-family:var(--mono);font-size:.65rem;background:var(--por-bg);color:var(--por);
   border:1px solid rgba(255,154,60,.2)}
 .dnum{font-family:var(--mono);font-size:.67rem;color:var(--dim);display:block}
-
-/* Expanded row detail */
-.detail-row td{padding:0}
-.detail-inner{padding:14px 18px 18px;background:var(--bg3);border-left:3px solid var(--border2);
+.det-row td{padding:0}
+.det-in{padding:14px 18px 18px;background:var(--bg3);border-left:3px solid var(--bdr2);
   margin:0 4px 4px;border-radius:0 0 var(--r) var(--r);font-size:.8rem;line-height:1.6}
-.d-meta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:11px;
+.dm{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:11px;
   font-family:var(--mono);font-size:.68rem;color:var(--dim)}
-.d-meta b{color:var(--med)}
-.d-breadcrumb{display:flex;align-items:center;gap:4px;margin-bottom:11px;font-family:var(--mono);font-size:.7rem}
+.dm b{color:var(--med)}
+.d-bc{display:flex;align-items:center;gap:4px;margin-bottom:10px;font-family:var(--mono);font-size:.7rem}
 .d-desc{color:var(--med);line-height:1.65}
 .v-chain{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-.vc-item{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;
-  background:var(--bg2);border:1px solid var(--border2);font-family:var(--mono);font-size:.68rem;color:var(--med)}
-.vc-item.cur{border-color:var(--accent-dim);color:var(--accent)}
-.vc-lbl{font-family:var(--mono);font-size:.62rem;color:var(--dim);margin-bottom:5px;margin-top:12px}
+.vci{display:inline-flex;padding:2px 8px;border-radius:4px;
+  background:var(--bg2);border:1px solid var(--bdr2);font-family:var(--mono);font-size:.68rem;color:var(--med)}
+.vci.cur{border-color:var(--acc-dim);color:var(--acc)}
+.vcl{font-family:var(--mono);font-size:.62rem;color:var(--dim);margin-bottom:5px;margin-top:12px}
 
-/* Loading / empty */
-#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  flex:1;gap:14px;color:var(--dim);font-family:var(--mono);font-size:.78rem}
-.spinner{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);
-  border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* Pagination */
+#pagination{display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:10px 14px;border-top:1px solid var(--bdr);flex-shrink:0;
+  font-family:var(--mono);font-size:.72rem;color:var(--dim);background:var(--bg)}
+#pagination button{padding:4px 12px;border-radius:var(--r);border:1px solid var(--bdr2);
+  color:var(--med);background:var(--bg2);font-family:var(--mono);font-size:.72rem;
+  cursor:pointer;transition:all .1s}
+#pagination button:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
+#pagination button:disabled{opacity:.35;cursor:default}
+#page-info{min-width:120px;text-align:center}
+
+/* Loading overlay — shown during download */
+#boot{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;z-index:100}
+.boot-logo{font-family:var(--sans);font-weight:800;font-size:1.3rem;color:#fff;
+  display:flex;align-items:center;gap:10px}
+.boot-logo span{color:var(--acc)}
+.boot-sq{display:grid;grid-template-columns:1fr 1fr;gap:3px;width:24px;height:24px}
+.boot-sq i{border-radius:2px;background:var(--acc)}
+.boot-sq i:nth-child(2){opacity:.5}.boot-sq i:nth-child(3){opacity:.5}.boot-sq i:nth-child(4){opacity:.2}
+.boot-stage{font-family:var(--mono);font-size:.78rem;color:var(--dim);min-height:1.2em;
+  transition:opacity .2s}
+.boot-bar-wrap{width:320px;height:4px;background:var(--bdr2);border-radius:2px;overflow:hidden}
+.boot-bar{height:100%;width:0%;background:var(--acc);border-radius:2px;
+  transition:width .1s linear}
+.boot-bytes{font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+
+/* Empty / spinner */
 #empty{display:none;flex-direction:column;align-items:center;justify-content:center;
   flex:1;gap:8px;color:var(--dim);font-family:var(--mono);font-size:.8rem;text-align:center;padding:40px}
+mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:0 1px}
 
-mark{background:rgba(61,158,255,.22);color:var(--accent);border-radius:2px;padding:0 1px}
+/* Changelog button */
+#changelog-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--r);
+  border:1px solid var(--bdr2);color:var(--med);font-family:var(--mono);font-size:.72rem;
+  background:var(--bg2);position:relative;transition:all .12s;flex-shrink:0}
+#changelog-btn:hover{border-color:var(--acc);color:var(--acc)}
+#changelog-badge{position:absolute;top:-4px;right:-4px;width:8px;height:8px;
+  border-radius:50%;background:var(--por);border:2px solid var(--bg2)}
+
+/* Changelog overlay */
+#cl-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60}
+#cl-overlay.open{display:block}
+
+/* Changelog drawer */
+#cl-drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,95vw);
+  background:var(--bg2);border-left:1px solid var(--bdr);z-index:61;
+  display:flex;flex-direction:column;transform:translateX(100%);
+  transition:transform .22s cubic-bezier(.4,0,.2,1)}
+#cl-drawer.open{transform:translateX(0)}
+
+#cl-header{display:flex;align-items:center;gap:10px;padding:14px 16px;
+  border-bottom:1px solid var(--bdr);flex-shrink:0}
+#cl-title{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.9rem;color:#fff;flex:1}
+#cl-meta{font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+#cl-close{display:flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:4px;color:var(--dim);transition:all .1s}
+#cl-close:hover{background:var(--bg3);color:var(--txt)}
+
+#cl-tabs{display:flex;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.cl-tab{flex:1;padding:9px;font-family:var(--mono);font-size:.72rem;color:var(--dim);
+  border-bottom:2px solid transparent;transition:all .12s}
+.cl-tab:hover{color:var(--txt);background:var(--bg3)}
+.cl-tab.act{color:var(--acc);border-bottom-color:var(--acc)}
+
+#cl-body{flex:1;overflow-y:auto;padding:0}
+
+/* Changelog timeline entries */
+.cl-entry{padding:14px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;
+  transition:background .08s}
+.cl-entry:hover{background:var(--bg3)}
+.cl-entry.expanded{background:var(--bg3)}
+.cl-entry-header{display:flex;align-items:flex-start;gap:10px}
+.cl-version{font-family:var(--mono);font-size:.72rem;background:var(--bg3);
+  border:1px solid var(--bdr2);border-radius:4px;padding:2px 6px;color:var(--med);
+  white-space:nowrap;flex-shrink:0}
+.cl-version.changed{border-color:var(--por);color:var(--por);background:var(--por-bg)}
+.cl-info{flex:1;min-width:0}
+.cl-date{font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+.cl-pills{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.cl-pill{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:3px;
+  font-family:var(--mono);font-size:.65rem;font-weight:500}
+.cl-pill.added   {background:rgba(56,217,134,.1);color:var(--enh)}
+.cl-pill.removed {background:rgba(255,80,80,.1); color:var(--def)}
+.cl-pill.modified{background:rgba(255,154,60,.1);color:var(--por)}
+.cl-pill.neutral {background:var(--bg3);color:var(--dim)}
+.cl-detail{display:none;margin-top:10px;padding:10px 12px;background:var(--bg);
+  border-radius:var(--r);font-family:var(--mono);font-size:.68rem}
+.cl-entry.expanded .cl-detail{display:block}
+.cl-key-list{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px}
+.cl-key{padding:1px 6px;border-radius:3px;background:var(--bg2);border:1px solid var(--bdr2);
+  color:var(--med);cursor:pointer;transition:border-color .1s}
+.cl-key:hover{border-color:var(--acc);color:var(--acc)}
+.cl-key-label{font-size:.62rem;color:var(--dim);margin-bottom:3px;text-transform:uppercase;
+  letter-spacing:.08em}
+.cl-empty{padding:40px 16px;text-align:center;font-family:var(--mono);font-size:.78rem;
+  color:var(--dim)}
+
+/* Changelog mobile */
+@media(max-width:700px){
+  #cl-drawer{width:100%}
+}
+
+/* Changelog button label — hide on very small screens */
+@media(max-width:500px){
+  #changelog-btn span.cl-label{display:none}
+}
+
+
+.amended-dot{display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--por);margin-left:5px;vertical-align:middle;flex-shrink:0;
+  title:"Description amended after initial publication"}
+.amended-badge{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;
+  border-radius:3px;font-family:var(--mono);font-size:.62rem;
+  background:var(--por-bg);color:var(--por);border:1px solid rgba(255,154,60,.15)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── MOBILE ── */
+@media (max-width: 700px) {
+  #sidebar { display: none }
+  #sidebar.mob-open {
+    display:flex;position:fixed;top:0;left:0;bottom:0;z-index:50;
+    width:min(280px,90vw);box-shadow:4px 0 24px rgba(0,0,0,.5)
+  }
+  #mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49}
+  #sidebar.mob-open ~ #mob-overlay{display:block}
+  #mob-menu{display:flex;align-items:center;justify-content:center;
+    width:34px;height:34px;border-radius:var(--r);color:var(--med);
+    border:1px solid var(--bdr2);flex-shrink:0}
+  #mob-menu:hover{color:var(--txt);border-color:var(--txt)}
+  /* Collapse statsbar on small screens */
+  #statsbar{display:none}
+  /* Simplify table columns: hide App Area and Date on tiny screens */
+  th:nth-child(3),td:nth-child(3),
+  th:nth-child(6),td:nth-child(6){display:none}
+  th:nth-child(1){width:88px}
+  th:nth-child(2){width:86px}
+  th:nth-child(5){width:70px}
+}
+@media (max-width: 700px) {
+  #mob-menu{display:flex}
+}
+@media (min-width: 701px) {
+  #mob-menu{display:none}
+  #mob-overlay{display:none!important}
+}
 </style>
 </head>
 <body>
-<div id="app">
 
+<!-- BOOT SCREEN — shown during download & init -->
+<div id="boot">
+  <div class="boot-logo">
+    <div class="boot-sq"><i></i><i></i><i></i><i></i></div>
+    Vantagepoint <span>Release Notes</span>
+  </div>
+  <div class="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
+  <div class="boot-stage" id="boot-stage">Connecting…</div>
+  <div class="boot-bytes" id="boot-bytes"></div>
+</div>
+
+<div id="app" style="display:none">
+<div id="mob-overlay" onclick="toggleSidebar()"></div>
   <div id="topbar">
     <div class="logo">
       <div class="logo-sq"><i></i><i></i><i></i><i></i></div>
       Vantagepoint <span>Release Notes</span>
     </div>
+    <button id="mob-menu" aria-label="Toggle filters" onclick="toggleSidebar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <div class="vdiv"></div>
     <div id="search-wrap">
       <svg class="sico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input id="search" type="text" placeholder="Search issues, defect numbers, modules…" autocomplete="off">
+      <div id="search-spinner"></div>
     </div>
     <div id="statsbar">Loading…</div>
+    <div class="vdiv"></div>
+    <button id="changelog-btn" onclick="openChangelog()" title="Scrape changelog" aria-label="Scrape changelog">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>
+      </svg>
+      <span id="changelog-badge" style="display:none"></span>
+    </button>
+  </div>
+
+  <!-- CHANGELOG DRAWER -->
+  <div id="cl-overlay" onclick="closeChangelog()"></div>
+  <div id="cl-drawer">
+    <div id="cl-header">
+      <div id="cl-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+        Scrape Changelog
+      </div>
+      <div id="cl-meta"></div>
+      <button onclick="closeChangelog()" id="cl-close" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="cl-tabs">
+      <button class="cl-tab act" data-tab="changes" onclick="switchCLTab('changes')">Changes only</button>
+      <button class="cl-tab" data-tab="all" onclick="switchCLTab('all')">All scrapes</button>
+    </div>
+    <div id="cl-body"></div>
   </div>
 
   <div id="body">
-
-    <!-- SIDEBAR -->
     <nav id="sidebar">
-
-      <!-- Type filters -->
-      <div class="sb-section">
-        <div class="sb-label">Issue Type</div>
-        <div class="tf act" data-type="all"><div class="dot" style="background:var(--med)"></div>All Issues<span class="cnt" id="cnt-all">—</span></div>
-        <div class="tf" data-type="defect"><div class="dot" style="background:var(--defect)"></div>Defects<span class="cnt" id="cnt-defect">—</span></div>
-        <div class="tf" data-type="enhancement"><div class="dot" style="background:var(--enhance)"></div>Enhancements<span class="cnt" id="cnt-enhancement">—</span></div>
-        <div class="tf" data-type="regulatory"><div class="dot" style="background:var(--reg)"></div>Regulatory<span class="cnt" id="cnt-regulatory">—</span></div>
-        <div class="tf" data-type="security"><div class="dot" style="background:var(--security)"></div>Security<span class="cnt" id="cnt-security">—</span></div>
-        <div class="tf" data-type="ported" style="margin-top:2px;border-top:1px solid var(--border)">
-          <div class="dot" style="background:var(--ported)"></div>Ported Defects<span class="cnt" id="cnt-ported">—</span>
-        </div>
+      <div class="sb-label">Issue Type</div>
+      <div class="tf act" data-type="all"><div class="dot" style="background:var(--med)"></div>All Issues<span class="cnt" id="cnt-all">—</span></div>
+      <div class="tf" data-type="defect"><div class="dot" style="background:var(--def)"></div>Defects<span class="cnt" id="cnt-defect">—</span></div>
+      <div class="tf" data-type="enhancement"><div class="dot" style="background:var(--enh)"></div>Enhancements<span class="cnt" id="cnt-enhancement">—</span></div>
+      <div class="tf" data-type="regulatory"><div class="dot" style="background:var(--reg)"></div>Regulatory<span class="cnt" id="cnt-regulatory">—</span></div>
+      <div class="tf" data-type="security"><div class="dot" style="background:var(--sec)"></div>Security<span class="cnt" id="cnt-security">—</span></div>
+      <div class="tf" data-type="ported" style="border-top:1px solid var(--bdr);margin-top:4px">
+        <div class="dot" style="background:var(--por)"></div>Ported Defects<span class="cnt" id="cnt-ported">—</span>
       </div>
-
-      <!-- Breadcrumb tree -->
-      <div class="sb-section">
-        <div class="sb-label">Application Area</div>
-        <div class="bc-tree" id="bc-tree"><!-- populated by JS --></div>
-      </div>
-
-      <!-- Version tree -->
-      <div class="sb-section">
-        <div class="sb-label">Version</div>
-        <div class="v-tree" id="v-tree"><!-- populated by JS --></div>
-      </div>
-
+      <div class="sb-label" style="margin-top:12px">Application Area</div>
+      <div class="bc-tree" id="bc-tree"></div>
+      <div class="sb-label" style="margin-top:12px">Version</div>
+      <div class="v-tree" id="v-tree"></div>
     </nav>
 
-    <!-- MAIN -->
     <div id="main">
       <div id="toolbar">
         <div class="chips" id="chips"></div>
-        <div id="rcnt">— results</div>
+        <div id="rcnt">—</div>
       </div>
-
       <div id="tbl-wrap">
-        <div id="loading">
-          <div class="spinner"></div>
-          <span id="loading-msg">Loading database…</span>
-        </div>
         <div id="empty">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           No issues match your filters.
@@ -293,191 +414,254 @@ mark{background:rgba(61,158,255,.22);color:var(--accent);border-radius:2px;paddi
           <tbody id="tbody"></tbody>
         </table>
       </div>
+      <div id="pagination" style="display:none">
+        <button id="pg-first" title="First page">«</button>
+        <button id="pg-prev"  title="Previous">‹</button>
+        <span id="page-info"></span>
+        <button id="pg-next"  title="Next">›</button>
+        <button id="pg-last"  title="Last page">»</button>
+      </div>
     </div>
-
   </div>
 </div>
 
 <script>
+"use strict";
+// ── CONFIG ────────────────────────────────────────────────────────────────
 const DB_URL      = "./release_notes.db";
 const SQLJS_JS    = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js";
 const SQLJS_WASM  = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm";
+const PAGE_SIZE   = 250;   // rows per page
+const DEBOUNCE_MS = 220;   // search debounce
 
-// ── STATE ────────────────────────────────────────────────────────
-let db, allRows = [];
+// ── WEB WORKER (inline blob — no extra file needed) ───────────────────────
+// All SQL runs in this worker thread, keeping the main thread free.
+const WORKER_SRC = [
+  '"use strict";',
+  'importScripts("' + SQLJS_JS + '");',
+  'let db = null;',
+  'self.onmessage = async function(e) {',
+  '  const { id, type, payload } = e.data;',
+  '  try {',
+  '    if (type === "init") {',
+  '      const SQL = await initSqlJs({ locateFile: () => "' + SQLJS_WASM + '" });',
+  '      db = new SQL.Database(new Uint8Array(payload));',
+  '      self.postMessage({ id, ok: true });',
+  '    } else if (type === "exec") {',
+  '      const { sql, params = [] } = payload;',
+  '      const stmt = db.prepare(sql);',
+  '      stmt.bind(params);',
+  '      const rows = [];',
+  '      while (stmt.step()) rows.push(stmt.getAsObject());',
+  '      stmt.free();',
+  '      self.postMessage({ id, ok: true, rows });',
+  '    }',
+  '  } catch(err) {',
+  '    self.postMessage({ id, ok: false, error: err.message });',
+  '  }',
+  '};',
+].join('\n');
+
+const workerBlob = new Blob([WORKER_SRC], { type: 'text/javascript' });
+const workerUrl  = URL.createObjectURL(workerBlob);
+const worker     = new Worker(workerUrl);
+
+// Promise bridge for worker messages
+let _msgId = 0;
+const _pending = new Map();
+worker.onmessage = ({ data }) => {
+  const p = _pending.get(data.id);
+  if (!p) return;
+  _pending.delete(data.id);
+  data.ok ? p.resolve(data) : p.reject(new Error(data.error));
+};
+worker.onerror = (e) => console.error("Worker error:", e);
+
+function workerSend(type, payload, transfer = []) {
+  return new Promise((resolve, reject) => {
+    const id = ++_msgId;
+    _pending.set(id, { resolve, reject });
+    worker.postMessage({ id, type, payload }, transfer);
+  });
+}
+
+// Async DB helpers (run in worker, non-blocking)
+function Q(sql, params = []) {
+  return workerSend("exec", { sql, params }).then(d => d.rows);
+}
+function Q1(sql, params = []) {
+  return Q(sql, params).then(rows => rows[0] || null);
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let totalRows = [];   // all matching rows from last query
+let page = 0;
 let expandedIdx = null;
 let sortCol = "release_date", sortDir = "desc";
 let filterType = "all";
-let filterVersion = null;     // patch_version string
-let filterNav1 = null;        // nav_level1 string
-let filterNav2 = null;        // nav_level2 string
-let filterNav3 = null;        // nav_level3 string
+let filterVersion = null;
+let filterNav1 = null, filterNav2 = null, filterNav3 = null;
 let searchQ = "";
+let searchTimer = null;
 
-// ── DB ───────────────────────────────────────────────────────────
+// ── BOOT: streaming download with progress bar ────────────────────────────
+function setStage(msg) { document.getElementById("boot-stage").textContent = msg; }
+function setProgress(pct) { document.getElementById("boot-bar").style.width = (pct * 100).toFixed(1) + "%"; }
+function setBytes(recv, total) {
+  const fmt = n => n >= 1048576 ? (n/1048576).toFixed(1) + " MB"
+                 : n >= 1024    ? (n/1024).toFixed(0) + " KB"
+                 : n + " B";
+  document.getElementById("boot-bytes").textContent =
+    total ? fmt(recv) + " / " + fmt(total) : fmt(recv);
+}
+
+async function downloadDB() {
+  setStage("Connecting to database…");
+  const resp = await fetch(DB_URL);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} fetching ${DB_URL}`);
+
+  const contentLength = parseInt(resp.headers.get("Content-Length") || "0", 10);
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let received = 0;
+
+  setStage("Downloading database…");
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    setBytes(received, contentLength);
+    setProgress(contentLength ? received / contentLength : 0.5);
+  }
+
+  // Assemble into one buffer
+  const buf = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) { buf.set(chunk, offset); offset += chunk.length; }
+  return buf.buffer;  // ArrayBuffer (not view) so it can be transferred
+}
+
 async function init() {
-  setMsg("Loading sql.js…");
-  const s = document.createElement("script"); s.src = SQLJS_JS;
-  document.head.appendChild(s);
-  await new Promise((ok, fail) => { s.onload = ok; s.onerror = fail; });
+  try {
+    const buffer = await downloadDB();
+    setStage("Initialising SQL engine…");
+    setProgress(0.97);
+    await workerSend("init", buffer, [buffer]);
+    setStage("Building filters…");
+    setProgress(1);
+    await buildBcTree();
+    await buildVersionTree();
+    await updateCounts();
+    await loadChangelog();
 
-  setMsg("Loading database…");
-  const SQL = await initSqlJs({ locateFile: () => SQLJS_WASM });
-  const buf = await fetch(DB_URL).then(r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.arrayBuffer();
-  });
-  db = new SQL.Database(new Uint8Array(buf));
-  setMsg("Building UI…");
-  buildBcTree();
-  buildVersionTree();
-  updateCounts();
-  runQuery();
-  document.getElementById("loading").style.display = "none";
-  document.getElementById("tbl").style.display = "";
+    // Restore state from URL hash before first query
+    const hadHash = applyHash();
+    if (hadHash) {
+      refreshNavHighlight();
+      if (filterVersion) {
+        const btn = document.querySelector(`.v-patch-btn[data-version="${CSS.escape(filterVersion)}"]`);
+        if (btn) {
+          btn.classList.add("sel");
+          const patches = btn.closest(".v-patches");
+          if (patches) patches.previousElementSibling?.classList.add("open");
+        }
+      }
+    }
+
+    await runQuery();
+    encodeHash();
+
+    document.getElementById("boot").style.display = "none";
+    document.getElementById("app").style.display  = "";
+
+  } catch (e) {
+    setStage("Error: " + e.message);
+    document.getElementById("boot-bar").style.background = "var(--def)";
+    console.error(e);
+  }
 }
 
-function setMsg(m){ document.getElementById("loading-msg").textContent = m; }
+// ── SIDEBAR: breadcrumb tree ──────────────────────────────────────────────
+async function buildBcTree() {
+  const rows = await Q(`
+    SELECT DISTINCT nav_level1, nav_level2, nav_level3, COUNT(*) n
+    FROM issues WHERE nav_level1 != ''
+    GROUP BY nav_level1, nav_level2, nav_level3
+    ORDER BY nav_level1, nav_level2, nav_level3`);
 
-function Q(sql, params = []) {
-  const st = db.prepare(sql); st.bind(params);
-  const rows = [];
-  while (st.step()) rows.push(st.getAsObject());
-  st.free();
-  return rows;
-}
-function Q1(sql, params = []) { return Q(sql, params)[0] || null; }
-
-// ── SIDEBAR: BREADCRUMB TREE ──────────────────────────────────────
-function buildBcTree() {
   const tree = {};
-  Q(`SELECT DISTINCT nav_level1, nav_level2, nav_level3,
-       COUNT(*) as n FROM issues
-     WHERE nav_level1 != ''
-     GROUP BY nav_level1, nav_level2, nav_level3
-     ORDER BY nav_level1, nav_level2, nav_level3`
-  ).forEach(r => {
+  for (const r of rows) {
     if (!tree[r.nav_level1]) tree[r.nav_level1] = {};
     const l2 = r.nav_level2 || "";
     if (!tree[r.nav_level1][l2]) tree[r.nav_level1][l2] = { n: 0, l3s: {} };
     tree[r.nav_level1][l2].n += r.n;
     if (r.nav_level3) tree[r.nav_level1][l2].l3s[r.nav_level3] = r.n;
-  });
+  }
 
-  const container = document.getElementById("bc-tree");
-  container.innerHTML = "";
-
+  const cont = document.getElementById("bc-tree");
+  cont.innerHTML = "";
   for (const [l1, l2map] of Object.entries(tree).sort()) {
     const l1cnt = Object.values(l2map).reduce((a, v) => a + v.n, 0);
-    const wrap = document.createElement("div");
-    wrap.className = "bc-l1-wrap";
+    const hasL2 = Object.keys(l2map).some(k => k !== "");
+    const wrap  = document.createElement("div"); wrap.className = "l1-wrap";
 
-    const l1btn = document.createElement("button");
-    l1btn.className = "bc-l1-btn";
+    const l1btn = document.createElement("button"); l1btn.className = "l1-btn";
     l1btn.dataset.l1 = l1;
-    l1btn.innerHTML = `
-      <span class="arrow">▶</span>
-      <span class="bc-l1-dot"></span>
-      <span style="flex:1;text-align:left">${esc(l1)}</span>
+    l1btn.innerHTML = `${hasL2 ? `<span class="arr">▶</span>` : `<span style="width:10px"></span>`}
+      <span class="l1d"></span><span style="flex:1;text-align:left">${esc(l1)}</span>
       <span class="bc-cnt">${l1cnt}</span>`;
-    l1btn.onclick = () => {
-      const isOpen = l1btn.classList.contains("open");
-      if (!isOpen) l1btn.classList.add("open");
-      // Toggle selection
-      if (filterNav1 === l1 && !filterNav2) {
-        clearNavFilter(); return;
-      }
-      setNavFilter(l1, null, null);
-    };
+    l1btn.onclick = () => { if(hasL2) l1btn.classList.toggle("open"); setNavFilter(l1, null, null, l1btn); };
 
-    const l2list = document.createElement("div");
-    l2list.className = "bc-l2-list";
-
+    const l2list = document.createElement("div"); l2list.className = "l2-list";
     for (const [l2, { n: l2n, l3s }] of Object.entries(l2map).sort()) {
-      const l2wrap = document.createElement("div");
-      l2wrap.className = "bc-l2-wrap";
-
+      if (!l2) continue;
       const hasL3 = Object.keys(l3s).length > 0;
-      const l2btn = document.createElement("button");
-      l2btn.className = "bc-l2-btn";
-      l2btn.dataset.l2 = l2;
-      if (l2) {
-        l2btn.innerHTML = `
-          ${hasL3 ? `<span class="arrow">▶</span>` : `<span style="width:9px"></span>`}
-          <span class="bc-l2-dot"></span>
-          <span style="flex:1;text-align:left">${esc(l2)}</span>
-          <span class="bc-cnt">${l2n}</span>`;
-        l2btn.onclick = () => {
-          if (hasL3 && !l2btn.classList.contains("open")) l2btn.classList.add("open");
-          if (filterNav1 === l1 && filterNav2 === l2 && !filterNav3) {
-            setNavFilter(l1, null, null); return;
-          }
-          setNavFilter(l1, l2, null);
-        };
-      }
-
-      const l3list = document.createElement("div");
-      l3list.className = "bc-l3-list";
+      const l2w   = document.createElement("div"); l2w.className = "l2-wrap";
+      const l2btn = document.createElement("button"); l2btn.className = "l2-btn"; l2btn.dataset.l2 = l2;
+      l2btn.innerHTML = `${hasL3 ? `<span class="arr">▶</span>` : `<span style="width:10px"></span>`}
+        <span class="l2d"></span><span style="flex:1;text-align:left">${esc(l2)}</span>
+        <span class="bc-cnt">${l2n}</span>`;
+      l2btn.onclick = () => { if(hasL3) l2btn.classList.toggle("open"); setNavFilter(l1, l2, null, l2btn); };
+      const l3list = document.createElement("div"); l3list.className = "l3-list";
       for (const [l3, l3n] of Object.entries(l3s).sort()) {
-        const l3btn = document.createElement("button");
-        l3btn.className = "bc-l3-btn";
-        l3btn.dataset.l3 = l3;
-        l3btn.innerHTML = `
-          <span class="bc-l3-dot"></span>
-          <span style="flex:1;text-align:left">${esc(l3)}</span>
-          <span class="bc-cnt">${l3n}</span>`;
-        l3btn.onclick = () => {
-          if (filterNav1 === l1 && filterNav2 === l2 && filterNav3 === l3) {
-            setNavFilter(l1, l2, null); return;
-          }
-          setNavFilter(l1, l2, l3);
-        };
+        const l3btn = document.createElement("button"); l3btn.className = "l3-btn"; l3btn.dataset.l3 = l3;
+        l3btn.innerHTML = `<span class="l3d"></span><span style="flex:1;text-align:left">${esc(l3)}</span><span class="bc-cnt">${l3n}</span>`;
+        l3btn.onclick = () => setNavFilter(l1, l2, l3, l3btn);
         l3list.appendChild(l3btn);
       }
-
-      if (l2) l2wrap.appendChild(l2btn);
-      if (hasL3) l2wrap.appendChild(l3list);
-      l2list.appendChild(l2wrap);
+      l2w.appendChild(l2btn); if(hasL3) l2w.appendChild(l3list);
+      l2list.appendChild(l2w);
     }
-
-    wrap.appendChild(l1btn);
-    wrap.appendChild(l2list);
-    container.appendChild(wrap);
+    wrap.appendChild(l1btn); if(hasL2) wrap.appendChild(l2list);
+    cont.appendChild(wrap);
   }
 }
 
-function setNavFilter(l1, l2, l3) {
-  filterNav1 = l1; filterNav2 = l2; filterNav3 = l3;
+function setNavFilter(l1, l2, l3, btn) {
+  const same = filterNav1 === l1 && filterNav2 === l2 && filterNav3 === l3;
+  filterNav1 = same ? null : l1;
+  filterNav2 = same ? null : l2;
+  filterNav3 = same ? null : l3;
   refreshNavHighlight();
-  runQuery();
-}
-function clearNavFilter() {
-  filterNav1 = filterNav2 = filterNav3 = null;
-  refreshNavHighlight();
-  runQuery();
-}
-function refreshNavHighlight() {
-  document.querySelectorAll(".bc-l1-btn").forEach(b => {
-    b.classList.remove("sel");
-    if (b.dataset.l1 === filterNav1) b.classList.add("sel","open");
-  });
-  document.querySelectorAll(".bc-l2-btn").forEach(b => {
-    b.classList.remove("sel");
-    if (filterNav2 && b.dataset.l2 === filterNav2) b.classList.add("sel","open");
-  });
-  document.querySelectorAll(".bc-l3-btn").forEach(b => {
-    b.classList.remove("sel");
-    if (filterNav3 && b.dataset.l3 === filterNav3) b.classList.add("sel");
-  });
+  triggerQuery();
 }
 
-// ── SIDEBAR: VERSION TREE ─────────────────────────────────────────
-function buildVersionTree() {
-  const majors = Q(`
+function clearNavFilter() { filterNav1 = filterNav2 = filterNav3 = null; refreshNavHighlight(); triggerQuery(); }
+
+function refreshNavHighlight() {
+  document.querySelectorAll(".l1-btn").forEach(b => { b.classList.remove("sel"); if(b.dataset.l1===filterNav1) b.classList.add("sel","open"); });
+  document.querySelectorAll(".l2-btn").forEach(b => { b.classList.remove("sel"); if(filterNav2&&b.dataset.l2===filterNav2) b.classList.add("sel","open"); });
+  document.querySelectorAll(".l3-btn").forEach(b => { b.classList.remove("sel"); if(filterNav3&&b.dataset.l3===filterNav3) b.classList.add("sel"); });
+}
+
+// ── SIDEBAR: version tree ─────────────────────────────────────────────────
+async function buildVersionTree() {
+  const majors = await Q(`
     SELECT r.major_version,
       (SELECT COUNT(*) FROM issue_versions iv
-       JOIN issues i ON i.id=iv.issue_id
-       WHERE iv.release_id IN (SELECT id FROM releases WHERE major_version=r.major_version)) as n
+       WHERE iv.release_id IN (SELECT id FROM releases WHERE major_version=r.major_version)) n
     FROM releases r GROUP BY r.major_version
     ORDER BY
       CASE WHEN CAST(substr(r.major_version,1,4) AS INTEGER)>=2025
@@ -485,89 +669,75 @@ function buildVersionTree() {
         ELSE CAST(replace(r.major_version,'.','') AS INTEGER)
       END DESC`);
 
-  const container = document.getElementById("v-tree");
-  container.innerHTML = "";
-
+  const cont = document.getElementById("v-tree");
+  cont.innerHTML = "";
   for (const { major_version } of majors) {
-    const patches = Q(`
+    const patches = await Q(`
       SELECT patch_version, release_date,
-        (SELECT COUNT(*) FROM issue_versions iv WHERE iv.release_id=r.id) as n
-      FROM releases r WHERE major_version=?
-      ORDER BY release_date DESC`, [major_version]);
+        (SELECT COUNT(*) FROM issue_versions iv WHERE iv.release_id=r.id) n
+      FROM releases r WHERE major_version=? ORDER BY release_date DESC`, [major_version]);
 
     const majBtn = document.createElement("button");
     majBtn.className = "v-maj-btn";
-    majBtn.innerHTML = `<span class="arrow">▶</span><span style="flex:1;text-align:left">${esc(major_version)}</span>`;
+    majBtn.innerHTML = `<span class="arr">▶</span><span style="flex:1;text-align:left">${esc(major_version)}</span>`;
     majBtn.onclick = () => majBtn.classList.toggle("open");
 
-    const pList = document.createElement("div");
-    pList.className = "v-patches";
+    const pList = document.createElement("div"); pList.className = "v-patches";
     for (const p of patches) {
       const pb = document.createElement("button");
-      pb.className = "v-patch-btn";
-      pb.dataset.version = p.patch_version;
+      pb.className = "v-patch-btn"; pb.dataset.version = p.patch_version;
       pb.innerHTML = `<span>${esc(p.patch_version)}</span><span class="bc-cnt">${p.n}</span>`;
       pb.onclick = () => {
         if (filterVersion === p.patch_version) { filterVersion = null; pb.classList.remove("sel"); }
-        else {
-          document.querySelectorAll(".v-patch-btn").forEach(b => b.classList.remove("sel"));
-          filterVersion = p.patch_version; pb.classList.add("sel");
-        }
-        runQuery();
+        else { document.querySelectorAll(".v-patch-btn").forEach(b=>b.classList.remove("sel")); filterVersion = p.patch_version; pb.classList.add("sel"); }
+        triggerQuery();
       };
       pList.appendChild(pb);
     }
-    container.appendChild(majBtn);
-    container.appendChild(pList);
+    cont.appendChild(majBtn);
+    cont.appendChild(pList);
   }
 }
 
-// ── COUNTS ───────────────────────────────────────────────────────
-function updateCounts() {
-  const rows = Q(`SELECT type, COUNT(DISTINCT id) n FROM issues GROUP BY type`);
+// ── COUNTS ────────────────────────────────────────────────────────────────
+async function updateCounts() {
+  const rows = await Q(`SELECT type, COUNT(DISTINCT id) n FROM issues GROUP BY type`);
   let total = 0;
-  rows.forEach(r => {
-    const el = document.getElementById(`cnt-${r.type}`);
-    if (el) el.textContent = r.n;
-    total += r.n;
-  });
+  rows.forEach(r => { const el=document.getElementById("cnt-"+r.type); if(el) el.textContent=r.n; total+=r.n; });
   document.getElementById("cnt-all").textContent = total;
-
-  const ported = Q1(`
-    SELECT COUNT(*) n FROM (
-      SELECT i.id FROM issues i JOIN issue_versions iv ON i.id=iv.issue_id
-      WHERE i.defect_number IS NOT NULL GROUP BY i.id HAVING COUNT(*)>1)`);
-  document.getElementById("cnt-ported").textContent = ported ? ported.n : 0;
-
-  document.getElementById("statsbar").innerHTML =
-    `<b>${total}</b> issues · <b>${rows.length}</b> types · <b>${ported?ported.n:0}</b> ported`;
+  const ported = await Q1(`SELECT COUNT(*) n FROM (SELECT i.id FROM issues i JOIN issue_versions iv ON i.id=iv.issue_id WHERE i.defect_number IS NOT NULL GROUP BY i.id HAVING COUNT(*)>1)`);
+  const portedN = ported ? ported.n : 0;
+  document.getElementById("cnt-ported").textContent = portedN;
+  document.getElementById("statsbar").innerHTML = `<b>${total}</b> issues · <b>${rows.length}</b> types · <b>${portedN}</b> ported`;
 }
 
-// ── QUERY ─────────────────────────────────────────────────────────
-function runQuery() {
-  const conds = [], ftsParams = [], restParams = [];
+// ── QUERY ─────────────────────────────────────────────────────────────────
+// triggerQuery: debounced, shows spinner, updates URL hash after query
+function triggerQuery() {
+  clearTimeout(searchTimer);
+  document.getElementById("search-spinner").style.display = "block";
+  searchTimer = setTimeout(async () => {
+    await runQuery();
+    encodeHash();
+  }, DEBOUNCE_MS);
+}
 
-  if (filterType !== "all" && filterType !== "ported") {
-    conds.push("i.type=?"); restParams.push(filterType);
-  }
-  if (filterType === "ported") {
-    conds.push("(SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1");
-    conds.push("i.defect_number IS NOT NULL");
-  }
-  if (filterVersion) { conds.push("r.patch_version=?"); restParams.push(filterVersion); }
-  if (filterNav1)    { conds.push("i.nav_level1=?");    restParams.push(filterNav1); }
-  if (filterNav2)    { conds.push("i.nav_level2=?");    restParams.push(filterNav2); }
-  if (filterNav3)    { conds.push("i.nav_level3=?");    restParams.push(filterNav3); }
+async function runQuery() {
+  const conds = [], params = [];
 
-  let ftsJoin = "";
   if (searchQ.trim()) {
     const q = searchQ.trim().replace(/['"]/g, "");
-    ftsJoin = `JOIN issues_fts ON issues_fts.rowid=i.id AND issues_fts MATCH ?`;
-    ftsParams.push(`"${q}"*`);
+    conds.push("i.id IN (SELECT rowid FROM issues_fts WHERE issues_fts MATCH ?)");
+    params.push(`"${q}"*`);
   }
+  if (filterType !== "all" && filterType !== "ported") { conds.push("i.type=?"); params.push(filterType); }
+  if (filterType === "ported") { conds.push("(SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1"); conds.push("i.defect_number IS NOT NULL"); }
+  if (filterVersion) { conds.push("r.patch_version=?"); params.push(filterVersion); }
+  if (filterNav1)    { conds.push("i.nav_level1=?");    params.push(filterNav1); }
+  if (filterNav2)    { conds.push("i.nav_level2=?");    params.push(filterNav2); }
+  if (filterNav3)    { conds.push("i.nav_level3=?");    params.push(filterNav3); }
 
   const where = conds.length ? `AND ${conds.join(" AND ")}` : "";
-  const allParams = [...ftsParams, ...restParams];
 
   const sql = `
     SELECT i.id, i.defect_number, i.type,
@@ -575,7 +745,7 @@ function runQuery() {
            i.title, i.description,
            r.patch_version, r.major_version, r.release_date, r.url AS release_url,
            (SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id) AS version_count
-    FROM issues i ${ftsJoin}
+    FROM issues i
     JOIN issue_versions iv ON iv.issue_id=i.id
     JOIN releases r ON r.id=iv.release_id
     WHERE 1=1 ${where}
@@ -587,175 +757,399 @@ function runQuery() {
       r.release_date DESC, i.type, i.nav_level1, i.nav_level2`;
 
   try {
-    allRows = Q(sql, allParams);
-  } catch(e) {
-    // FTS fail fallback
-    allRows = Q(sql.replace(ftsJoin,""), restParams);
+    totalRows = await Q(sql, params);
+  } catch {
+    // FTS unavailable — fall back to LIKE search
+    if (searchQ.trim()) {
+      const likeTerm = `%${searchQ.trim().replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+      const likeConds = conds.slice(1).concat(["(i.title LIKE ? OR i.description LIKE ? OR i.breadcrumb LIKE ?)"]);
+      const likeWhere = likeConds.length ? `AND ${likeConds.join(" AND ")}` : "";
+      const likeParams = [...params.slice(1), likeTerm, likeTerm, likeTerm];
+      totalRows = await Q(sql.replace(where, likeWhere), likeParams);
+    } else {
+      totalRows = await Q(sql, params);
+    }
   }
 
-  renderTable();
+  document.getElementById("search-spinner").style.display = "none";
+  page = 0;
+  expandedIdx = null;
+  renderPage();
   renderChips();
-  document.getElementById("rcnt").textContent =
-    `${allRows.length.toLocaleString()} result${allRows.length!==1?"s":""}`;
+  renderPagination();
 }
 
-// ── RENDER ────────────────────────────────────────────────────────
-const TYPE_LABEL = {defect:"Defect",enhancement:"Enhancement",regulatory:"Regulatory",security:"Security"};
+// ── RENDER ────────────────────────────────────────────────────────────────
+const TYPE_LABEL = { defect:"Defect", enhancement:"Enhancement", regulatory:"Regulatory", security:"Security" };
 
-function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function hl(s,q){
-  if(!q||!s) return esc(s);
-  const e=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-  return esc(s).replace(new RegExp(`(${e})`,"gi"),"<mark>$1</mark>");
+function esc(s) {
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
-function fmtDate(d){
-  if(!d) return "—";
-  const [y,m,day]=d.split("-");
+function hl(s, q) {
+  if (!q || !s) return esc(s);
+  const e = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return esc(s).replace(new RegExp(`(${e})`, "gi"), "<mark>$1</mark>");
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
   return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]} ${+day} ${y}`;
 }
-
-function bcHtml(l1,l2,l3,q){
-  let h = "";
-  if(l1) h += `<span class="bc-seg l1">${hl(l1,q)}</span>`;
-  if(l2) h += `<span class="bc-arrow">›</span><span class="bc-seg l2">${hl(l2,q)}</span>`;
-  if(l3) h += `<span class="bc-arrow">›</span><span class="bc-seg l3">${hl(l3,q)}</span>`;
+function bcHtml(l1, l2, l3, q) {
+  if (!l1) return "";
+  let h = `<span class="bs1">${hl(l1,q)}</span>`;
+  if (l2) h += `<span class="ba">›</span><span class="bs2">${hl(l2,q)}</span>`;
+  if (l3) h += `<span class="ba">›</span><span class="bs3">${hl(l3,q)}</span>`;
   return `<div class="bc-cell">${h}</div>`;
 }
 
-function renderTable(){
-  const tbody = document.getElementById("tbody");
-  expandedIdx = null;
-  const q = searchQ.trim();
+function renderPage() {
+  const tbl   = document.getElementById("tbl");
+  const tbody  = document.getElementById("tbody");
+  const empty  = document.getElementById("empty");
+  const rcnt   = document.getElementById("rcnt");
+  const q      = searchQ.trim();
+  const start  = page * PAGE_SIZE;
+  const pageRows = totalRows.slice(start, start + PAGE_SIZE);
 
-  if(!allRows.length){
-    document.getElementById("tbl").style.display="none";
-    document.getElementById("empty").style.display="flex";
-    return;
+  rcnt.textContent = `${totalRows.length.toLocaleString()} result${totalRows.length !== 1 ? "s" : ""}`;
+
+  if (!totalRows.length) {
+    tbl.style.display = "none"; empty.style.display = "flex"; return;
   }
-  document.getElementById("tbl").style.display="";
-  document.getElementById("empty").style.display="none";
+  tbl.style.display = ""; empty.style.display = "none";
 
-  let html = "";
-  allRows.forEach((r,i) => {
+  // Build full HTML as string — much faster than DOM per-row
+  const parts = [];
+  for (let i = 0; i < pageRows.length; i++) {
+    const r   = pageRows[i];
+    const idx = start + i;
     const ported = r.version_count > 1;
-    html += `
-      <tr data-idx="${i}" onclick="toggleDetail(${i})">
+    parts.push(`
+      <tr data-idx="${idx}" onclick="toggleDetail(${idx})">
         <td><span class="vbadge">${esc(r.patch_version)}</span></td>
-        <td><span class="tbadge ${r.type}">${TYPE_LABEL[r.type]||r.type}</span></td>
-        <td>${bcHtml(r.nav_level1,r.nav_level2,r.nav_level3,q)}</td>
-        <td>${r.defect_number?`<span class="dnum">#${r.defect_number}</span>`:""}${hl(r.title,q)}</td>
-        <td>${ported?`<span class="pbadge">⇢ ${r.version_count}</span>`:`<span style="color:var(--dim);font-family:var(--mono);font-size:.65rem">—</span>`}</td>
+        <td><span class="tbadge ${r.type}">${TYPE_LABEL[r.type] || r.type}</span></td>
+        <td>${bcHtml(r.nav_level1, r.nav_level2, r.nav_level3, q)}</td>
+        <td>${r.defect_number ? `<span class="dnum">#${r.defect_number}</span>` : ""}${hl(r.title, q)}</td>
+        <td>${ported ? `<span class="pbadge">⇢ ${r.version_count}</span>` : `<span style="color:var(--dim);font-family:var(--mono);font-size:.65rem">—</span>`}</td>
         <td style="font-family:var(--mono);font-size:.65rem;color:var(--dim)">${fmtDate(r.release_date)}</td>
       </tr>
-      <tr class="detail-row" id="det-${i}" style="display:none"><td colspan="6"></td></tr>`;
-  });
-  tbody.innerHTML = html;
+      <tr class="det-row" id="det-${idx}" style="display:none"><td colspan="6"></td></tr>`);
+  }
+  tbody.innerHTML = parts.join("");
 }
 
-function toggleDetail(idx){
-  const det = document.getElementById(`det-${idx}`);
+async function toggleDetail(idx) {
+  const det     = document.getElementById(`det-${idx}`);
   const mainRow = document.querySelector(`tr[data-idx="${idx}"]`);
-  if(expandedIdx===idx){
-    det.style.display="none"; mainRow.classList.remove("exp"); expandedIdx=null; return;
+  if (expandedIdx === idx) {
+    det.style.display = "none"; mainRow.classList.remove("exp"); expandedIdx = null; return;
   }
-  if(expandedIdx!==null){
-    const pd=document.getElementById(`det-${expandedIdx}`);
-    const pm=document.querySelector(`tr[data-idx="${expandedIdx}"]`);
-    if(pd) pd.style.display="none"; if(pm) pm.classList.remove("exp");
+  if (expandedIdx !== null) {
+    const pd = document.getElementById(`det-${expandedIdx}`);
+    const pm = document.querySelector(`tr[data-idx="${expandedIdx}"]`);
+    if (pd) pd.style.display = "none"; if (pm) pm.classList.remove("exp");
   }
-  expandedIdx=idx; mainRow.classList.add("exp"); det.style.display="";
+  expandedIdx = idx; mainRow.classList.add("exp"); det.style.display = "";
 
-  const r = allRows[idx];
-  const versions = Q(`
-    SELECT r.patch_version, r.release_date
-    FROM releases r JOIN issue_versions iv ON iv.release_id=r.id
-    WHERE iv.issue_id=? ORDER BY r.release_date DESC`, [r.id]);
+  const r = totalRows[idx];
+  const [versions, issueDetail] = await Promise.all([
+    Q(`SELECT r.patch_version, r.release_date FROM releases r
+       JOIN issue_versions iv ON iv.release_id=r.id
+       WHERE iv.issue_id=? ORDER BY r.release_date DESC`, [r.id]),
+    Q1(`SELECT first_seen_at, updated_at FROM issues WHERE id=?`, [r.id]),
+  ]);
 
   const chainHtml = versions.map(v =>
-    `<span class="vc-item${v.patch_version===r.patch_version?" cur":""}">${esc(v.patch_version)}</span>`
+    `<span class="vci${v.patch_version === r.patch_version ? " cur" : ""}">${esc(v.patch_version)}</span>`
   ).join(`<span style="color:var(--dim);font-size:.6rem;margin:0 1px">→</span>`);
 
-  // Breadcrumb in detail
-  let bcDetail = "";
-  if(r.nav_level1) bcDetail += `<span class="bc-seg l1">${esc(r.nav_level1)}</span>`;
-  if(r.nav_level2) bcDetail += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bc-seg l2">${esc(r.nav_level2)}</span>`;
-  if(r.nav_level3) bcDetail += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bc-seg l3">${esc(r.nav_level3)}</span>`;
+  let bcd = r.nav_level1 ? `<span class="bs1">${esc(r.nav_level1)}</span>` : "";
+  if (r.nav_level2) bcd += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bs2">${esc(r.nav_level2)}</span>`;
+  if (r.nav_level3) bcd += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bs3">${esc(r.nav_level3)}</span>`;
+
+  // Was the description amended after first publication?
+  const wasAmended = issueDetail &&
+    issueDetail.updated_at && issueDetail.first_seen_at &&
+    issueDetail.updated_at.slice(0,10) !== issueDetail.first_seen_at.slice(0,10);
+  const amendedBadge = wasAmended
+    ? `<span class="amended-badge">⟳ amended ${issueDetail.updated_at.slice(0,10)}</span>`
+    : "";
 
   det.querySelector("td").innerHTML = `
-    <div class="detail-inner">
-      ${bcDetail?`<div class="d-breadcrumb bc-cell" style="margin-bottom:10px">${bcDetail}</div>`:""}
-      <div class="d-meta">
-        ${r.defect_number?`<span><b>Defect #</b>${esc(r.defect_number)}</span>`:""}
-        <span><b>Type</b> ${TYPE_LABEL[r.type]||r.type}</span>
+    <div class="det-in">
+      ${bcd ? `<div class="d-bc bc-cell" style="margin-bottom:10px">${bcd}</div>` : ""}
+      <div class="dm">
+        ${r.defect_number ? `<span><b>Defect #</b>${esc(r.defect_number)}</span>` : ""}
+        <span><b>Type</b> ${TYPE_LABEL[r.type] || r.type}</span>
         <span><b>Released</b> ${fmtDate(r.release_date)}</span>
-        ${r.version_count>1?`<span style="color:var(--ported)"><b>Ported</b> ${r.version_count} versions</span>`:""}
-        ${r.release_url?`<a href="${esc(r.release_url)}" target="_blank" rel="noopener"
-          style="font-family:var(--mono);font-size:.65rem">↗ Release Notes</a>`:""}
+        ${r.version_count > 1 ? `<span style="color:var(--por)"><b>Ported</b> ${r.version_count} versions</span>` : ""}
+        ${amendedBadge}
+        ${r.release_url ? `<a href="${esc(r.release_url)}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:.65rem">↗ Release Notes</a>` : ""}
       </div>
-      <div class="d-desc">${esc(r.description||r.title)}</div>
-      ${versions.length>1?`<div class="vc-lbl">VERSION HISTORY</div><div class="v-chain">${chainHtml}</div>`:""}
+      <div class="d-desc">${esc(r.description || r.title)}</div>
+      ${versions.length > 1 ? `<div class="vcl">VERSION HISTORY</div><div class="v-chain">${chainHtml}</div>` : ""}
     </div>`;
 }
 
-// ── CHIPS ─────────────────────────────────────────────────────────
-function renderChips(){
-  const c = document.getElementById("chips"); c.innerHTML="";
-  if(filterType!=="all"){
-    const col=filterType==="ported"?"--ported":`--${filterType}`;
-    addChip(c,TYPE_LABEL[filterType]||filterType,col,()=>{
-      filterType="all";
-      document.querySelectorAll(".tf").forEach(el=>el.classList.remove("act"));
-      document.querySelector('.tf[data-type="all"]').classList.add("act");
-      runQuery();
+// ── PAGINATION ────────────────────────────────────────────────────────────
+function renderPagination() {
+  const pgWrap = document.getElementById("pagination");
+  const totalPages = Math.ceil(totalRows.length / PAGE_SIZE);
+  if (totalPages <= 1) { pgWrap.style.display = "none"; return; }
+  pgWrap.style.display = "flex";
+  document.getElementById("page-info").textContent =
+    `Page ${page + 1} of ${totalPages} · ${totalRows.length.toLocaleString()} results`;
+  document.getElementById("pg-first").disabled = page === 0;
+  document.getElementById("pg-prev").disabled  = page === 0;
+  document.getElementById("pg-next").disabled  = page >= totalPages - 1;
+  document.getElementById("pg-last").disabled  = page >= totalPages - 1;
+}
+
+function goPage(n) {
+  const totalPages = Math.ceil(totalRows.length / PAGE_SIZE);
+  page = Math.max(0, Math.min(n, totalPages - 1));
+  expandedIdx = null;
+  renderPage();
+  renderPagination();
+  document.getElementById("tbl-wrap").scrollTop = 0;
+}
+
+document.getElementById("pg-first").onclick = () => goPage(0);
+document.getElementById("pg-prev").onclick  = () => goPage(page - 1);
+document.getElementById("pg-next").onclick  = () => goPage(page + 1);
+document.getElementById("pg-last").onclick  = () => goPage(Infinity);
+
+// ── CHIPS ─────────────────────────────────────────────────────────────────
+function renderChips() {
+  const c = document.getElementById("chips"); c.innerHTML = "";
+  if (filterType !== "all") {
+    const col = filterType === "ported" ? "--por" : `--${filterType}`;
+    addChip(c, TYPE_LABEL[filterType] || filterType, col, () => {
+      filterType = "all"; document.querySelectorAll(".tf").forEach(x => x.classList.remove("act"));
+      document.querySelector('.tf[data-type="all"]').classList.add("act"); triggerQuery();
     });
   }
-  if(filterNav1){
-    let label=filterNav1;
-    if(filterNav2) label+=` › ${filterNav2}`;
-    if(filterNav3) label+=` › ${filterNav3}`;
-    addChip(c,label,"--nav-l1",()=>{ clearNavFilter(); });
+  if (filterNav1) {
+    let label = filterNav1;
+    if (filterNav2) label += ` › ${filterNav2}`;
+    if (filterNav3) label += ` › ${filterNav3}`;
+    addChip(c, label, "--l1", clearNavFilter, "l1c");
   }
-  if(filterVersion){
-    addChip(c,`v${filterVersion}`,"--accent",()=>{
-      filterVersion=null;
-      document.querySelectorAll(".v-patch-btn").forEach(b=>b.classList.remove("sel"));
-      runQuery();
+  if (filterVersion) {
+    addChip(c, `v${filterVersion}`, "--acc", () => {
+      filterVersion = null; document.querySelectorAll(".v-patch-btn").forEach(b => b.classList.remove("sel")); triggerQuery();
     });
   }
-  if(searchQ.trim()){
-    addChip(c,`"${searchQ.trim()}"`,"--med",()=>{
-      searchQ=""; document.getElementById("search").value=""; runQuery();
+  if (searchQ.trim()) {
+    addChip(c, `"${searchQ.trim()}"`, "--med", () => {
+      searchQ = ""; document.getElementById("search").value = ""; triggerQuery();
     });
   }
 }
-function addChip(parent,label,colorVar,onClick){
-  const ch=document.createElement("div");
-  ch.className="chip act";
-  ch.innerHTML=`<div class="cdot" style="background:var(${colorVar})"></div>${esc(label)}<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
-  ch.onclick=onClick; parent.appendChild(ch);
+function addChip(parent, label, colorVar, onClick, extraClass = "") {
+  const ch = document.createElement("div");
+  ch.className = `chip act ${extraClass}`;
+  ch.innerHTML = `<div class="cdot" style="background:var(${colorVar})"></div>${esc(label)}<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+  ch.onclick = onClick; parent.appendChild(ch);
 }
 
-// ── EVENTS ────────────────────────────────────────────────────────
-document.getElementById("search").addEventListener("input", e=>{
-  searchQ=e.target.value; runQuery();
+// ── EVENTS ────────────────────────────────────────────────────────────────
+document.getElementById("search").addEventListener("input", e => {
+  searchQ = e.target.value;
+  triggerQuery();
 });
-document.querySelectorAll(".tf").forEach(el=>{
-  el.addEventListener("click",()=>{
-    document.querySelectorAll(".tf").forEach(x=>x.classList.remove("act"));
-    el.classList.add("act"); filterType=el.dataset.type; runQuery();
-  });
-});
-document.querySelectorAll("th.sortable").forEach(th=>{
-  th.addEventListener("click",()=>{
-    const col=th.dataset.col;
-    if(sortCol===col) sortDir=sortDir==="desc"?"asc":"desc";
-    else { sortCol=col; sortDir="desc"; }
-    document.querySelectorAll("th").forEach(t=>t.classList.remove("sort-asc","sort-desc"));
-    th.classList.add(sortDir==="desc"?"sort-desc":"sort-asc");
-    runQuery();
+
+document.querySelectorAll(".tf").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".tf").forEach(x => x.classList.remove("act"));
+    el.classList.add("act"); filterType = el.dataset.type; triggerQuery();
   });
 });
 
+document.querySelectorAll("th.sortable").forEach(th => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.col;
+    if (sortCol === col) sortDir = sortDir === "desc" ? "asc" : "desc";
+    else { sortCol = col; sortDir = "desc"; }
+    document.querySelectorAll("th").forEach(t => t.classList.remove("sort-asc","sort-desc"));
+    th.classList.add(sortDir === "desc" ? "sort-desc" : "sort-asc");
+    triggerQuery();
+  });
+});
+
+// ── CHANGELOG ─────────────────────────────────────────────────────
+let clTab = "changes";
+let clData = [];
+
+async function loadChangelog() {
+  clData = await Q(`
+    SELECT sh.id, sh.scraped_at, sh.page_last_updated, sh.status,
+           sh.issue_count, sh.changed,
+           sh.added_keys, sh.removed_keys, sh.modified_keys,
+           r.patch_version, r.major_version, r.release_date, r.url AS release_url
+    FROM scrape_history sh
+    JOIN releases r ON r.url = sh.url
+    ORDER BY sh.scraped_at DESC, sh.id DESC`);
+
+  // Badge: show orange dot if any changes detected
+  const hasChanges = clData.some(r => r.changed);
+  document.getElementById("changelog-badge").style.display = hasChanges ? "block" : "none";
+
+  // Meta: last scraped
+  const latest = clData[0];
+  if (latest) {
+    document.getElementById("cl-meta").textContent =
+      `Last scraped ${fmtDate(latest.scraped_at?.slice(0,10))}`;
+  }
+}
+
+function openChangelog() {
+  document.getElementById("cl-overlay").classList.add("open");
+  document.getElementById("cl-drawer").classList.add("open");
+  renderChangelog();
+}
+
+function closeChangelog() {
+  document.getElementById("cl-overlay").classList.remove("open");
+  document.getElementById("cl-drawer").classList.remove("open");
+}
+
+function switchCLTab(tab) {
+  clTab = tab;
+  document.querySelectorAll(".cl-tab").forEach(b => b.classList.toggle("act", b.dataset.tab === tab));
+  renderChangelog();
+}
+
+function renderChangelog() {
+  const body  = document.getElementById("cl-body");
+  const rows  = clTab === "changes" ? clData.filter(r => r.changed) : clData;
+
+  if (!rows.length) {
+    body.innerHTML = `<div class="cl-empty">${
+      clTab === "changes"
+        ? "No changes detected yet.<br>Run the scraper with <code>--resume</code> to start tracking amendments."
+        : "No scrape history yet."
+    }</div>`;
+    return;
+  }
+
+  body.innerHTML = rows.map((r, idx) => {
+    const added    = JSON.parse(r.added_keys    || "[]");
+    const removed  = JSON.parse(r.removed_keys  || "[]");
+    const modified = JSON.parse(r.modified_keys || "[]");
+    const isChanged = r.changed;
+    const scrapedDate  = r.scraped_at?.slice(0, 10) || "—";
+    const plu = r.page_last_updated || null;
+
+    // Pills
+    let pills = "";
+    if (isChanged) {
+      if (added.length)    pills += `<span class="cl-pill added">+${added.length} added</span>`;
+      if (removed.length)  pills += `<span class="cl-pill removed">−${removed.length} removed</span>`;
+      if (modified.length) pills += `<span class="cl-pill modified">~${modified.length} amended</span>`;
+    } else {
+      pills += `<span class="cl-pill neutral">${r.issue_count} issues · no change</span>`;
+    }
+
+    // Detail: issue key lists with clickable links to filter
+    let detail = "";
+    if (isChanged) {
+      if (added.length)    detail += `<div class="cl-key-label">Added</div><div class="cl-key-list">${added.map(k => keyChip(k, "enh")).join("")}</div>`;
+      if (removed.length)  detail += `<div class="cl-key-label" style="margin-top:8px">Removed</div><div class="cl-key-list">${removed.map(k => keyChip(k, "def")).join("")}</div>`;
+      if (modified.length) detail += `<div class="cl-key-label" style="margin-top:8px">Description amended</div><div class="cl-key-list">${modified.map(k => keyChip(k, "por")).join("")}</div>`;
+      if (plu) detail += `<div style="margin-top:8px;color:var(--dim)">Page last updated: <b style="color:var(--med)">${plu}</b></div>`;
+      if (r.release_url) detail += `<div style="margin-top:6px"><a href="${esc(r.release_url)}" target="_blank" rel="noopener" style="color:var(--acc);font-size:.65rem">↗ View release notes page</a></div>`;
+    }
+
+    return `<div class="cl-entry${isChanged ? "" : ""}" onclick="toggleCLEntry(${idx}, event)">
+      <div class="cl-entry-header">
+        <span class="cl-version${isChanged ? " changed" : ""}">${esc(r.patch_version)}</span>
+        <div class="cl-info">
+          <div class="cl-date">Scraped ${scrapedDate}${plu && plu !== r.release_date ? ` · page updated ${plu}` : ""}</div>
+          <div class="cl-pills">${pills}</div>
+        </div>
+        ${isChanged ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--dim);flex-shrink:0;margin-top:2px"><path d="m9 18 6-6-6-6"/></svg>` : ""}
+      </div>
+      ${detail ? `<div class="cl-detail">${detail}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function keyChip(key, colour) {
+  // key is either "D{defect_number}" or "E{hash}"
+  const isDefect = key.startsWith("D");
+  const label    = isDefect ? `#${key.slice(1)}` : key.slice(0,10) + "…";
+  const onclick  = isDefect
+    ? `closeChangelog();document.getElementById('search').value='${key.slice(1)}';searchQ='${key.slice(1)}';triggerQuery();`
+    : "";
+  return `<span class="cl-key" style="color:var(--${colour})" onclick="${onclick}" title="${esc(key)}">${label}</span>`;
+}
+
+function toggleCLEntry(idx, e) {
+  if (e.target.closest("a, .cl-key")) return;
+  const entries = document.querySelectorAll(".cl-entry");
+  const entry   = entries[idx];
+  if (!entry) return;
+  const detail = entry.querySelector(".cl-detail");
+  if (!detail) return;
+  // Close all others
+  document.querySelectorAll(".cl-entry.expanded").forEach(el => {
+    if (el !== entry) el.classList.remove("expanded");
+  });
+  entry.classList.toggle("expanded");
+}
+
+// ── URL HASH deep linking ─────────────────────────────────────────
+// Format: #q=search&type=defect&nav1=Hubs&nav2=Projects&nav3=Planning&ver=2025.1.4
+
+function encodeHash() {
+  const p = new URLSearchParams();
+  if (searchQ.trim())       p.set("q",    searchQ.trim());
+  if (filterType !== "all") p.set("type", filterType);
+  if (filterNav1)           p.set("nav1", filterNav1);
+  if (filterNav2)           p.set("nav2", filterNav2);
+  if (filterNav3)           p.set("nav3", filterNav3);
+  if (filterVersion)        p.set("ver",  filterVersion);
+  const s = p.toString();
+  history.replaceState(null, "", s ? "#" + s : location.pathname + location.search);
+}
+
+function applyHash() {
+  const hash = location.hash.slice(1);
+  if (!hash) return false;
+  const p = new URLSearchParams(hash);
+  searchQ       = p.get("q")    || "";
+  filterType    = p.get("type") || "all";
+  filterNav1    = p.get("nav1") || null;
+  filterNav2    = p.get("nav2") || null;
+  filterNav3    = p.get("nav3") || null;
+  filterVersion = p.get("ver")  || null;
+  document.getElementById("search").value = searchQ;
+  document.querySelectorAll(".tf").forEach(el => {
+    el.classList.toggle("act", el.dataset.type === filterType);
+  });
+  return !!(searchQ || filterType !== "all" || filterNav1 || filterVersion);
+}
+
+// ── KEYBOARD SHORTCUTS ────────────────────────────────────────────
+document.addEventListener("keydown", e => {
+  const search = document.getElementById("search");
+  if (e.key === "/" && document.activeElement !== search) {
+    e.preventDefault(); search.focus(); search.select();
+  }
+  if (e.key === "Escape" && document.activeElement === search) {
+    if (searchQ) { searchQ = ""; search.value = ""; triggerQuery(); }
+    else search.blur();
+  }
+});
+
+// ── MOBILE SIDEBAR ────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("mob-open");
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────
 init();
 </script>
 </body>

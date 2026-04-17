@@ -45,8 +45,11 @@ jobs:
         id: db-cache
         with:
           path: db/release_notes.db
-          key: release-notes-db-${{ hashFiles('scraper/scraper.py') }}
-          restore-keys: release-notes-db-
+          # Week-scoped key: persists across scraper code changes within a week.
+          # Changing the key prefix (e.g. v2→v3) forces a full re-scrape when needed.
+          key: release-notes-db-v1-${{ github.run_id }}
+          restore-keys: |
+            release-notes-db-v1-
 
       - name: Run scraper
         # --resume  : skip already-scraped old releases
@@ -61,7 +64,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: db/release_notes.db
-          key: release-notes-db-${{ hashFiles('db/release_notes.db') }}-${{ github.run_id }}
+          key: release-notes-db-v1-${{ github.run_id }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

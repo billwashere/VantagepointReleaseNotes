@@ -81,7 +81,18 @@ class PersistError(ScraperError):
 # Configuration
 # ---------------------------------------------------------------------------
 
-INDEX_URLS: list[str] = [
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+# Master index page — Deltek updates this when new versions ship.
+# The scraper discovers all version index URLs from here automatically,
+# so 2026.3, 2026.4, etc. are picked up without any code changes.
+MASTER_INDEX_URL = "https://help.deltek.com/product/Vantagepoint/ReleaseNotes/"
+
+# Fallback list used only when MASTER_INDEX_URL is unreachable.
+# Does NOT include 7.3 — it was never published (404 confirmed).
+_FALLBACK_INDEX_URLS: list[str] = [
     "https://help.deltek.com/product/Vantagepoint/2.0/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/3.0/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/3.5/ReleaseNotes/",
@@ -94,7 +105,6 @@ INDEX_URLS: list[str] = [
     "https://help.deltek.com/product/Vantagepoint/7.0/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/7.1/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/7.2/ReleaseNotes/",
-    "https://help.deltek.com/product/Vantagepoint/7.3/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/2025.1/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/2025.2/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/2025.3/ReleaseNotes/",
@@ -102,6 +112,55 @@ INDEX_URLS: list[str] = [
     "https://help.deltek.com/product/Vantagepoint/2026.1/ReleaseNotes/",
     "https://help.deltek.com/product/Vantagepoint/2026.2/ReleaseNotes/",
 ]
+
+# Pattern for version index URLs extracted from the master page
+_VERSION_INDEX_RE = re.compile(
+    r"https://help\.deltek\.com/product/Vantagepoint/([\d.]+)/ReleaseNotes",
+    re.IGNORECASE,
+)
+
+
+def discover_index_urls() -> list[str]:
+    """
+    Fetch the master index page and return all version-specific index URLs,
+    newest version first (order preserved from the page).
+
+    Falls back to _FALLBACK_INDEX_URLS with a warning if the page is
+    unreachable, so the scraper still works offline or during outages.
+    """
+    try:
+        html = fetch_html(MASTER_INDEX_URL)
+    except NetworkError as exc:
+        log.warning("Master index unreachable (%s) — using fallback list", exc)
+        return list(_FALLBACK_INDEX_URLS)
+
+    if not html:
+        log.warning("Master index returned empty — using fallback list")
+        return list(_FALLBACK_INDEX_URLS)
+
+    soup = BeautifulSoup(html, "lxml")
+    seen: set[str] = set()
+    urls: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        m = _VERSION_INDEX_RE.search(href)
+        if not m:
+            continue
+        # Normalise: ensure trailing slash so urljoin works downstream
+        normalised = href.rstrip("/") + "/"
+        if normalised not in seen:
+            seen.add(normalised)
+            urls.append(normalised)
+
+    if not urls:
+        log.warning("No version URLs found on master index — using fallback list")
+        return list(_FALLBACK_INDEX_URLS)
+
+    log.info(
+        "Discovered %d version index URLs from master index (newest: %s)",
+        len(urls), urls[0] if urls else "—",
+    )
+    return urls
 
 HEADERS: dict[str, str] = {
     "User-Agent": (
@@ -323,8 +382,16 @@ def make_content_hash(issues: list[dict]) -> str:
 
 SECTION_PATTERNS = {
     "regulatory": re.compile(r"regulatory\s+enhancements?", re.I),
-    "enhancement": re.compile(r"^enhancements?$", re.I),
-    "defect":      re.compile(r"software\s+issues?\s+resolved", re.I),
+    # "Enhancements" is the modern heading; "New Features" and
+    # "New Features and Enhancements" were used in some 2.0–4.x pages.
+    "enhancement": re.compile(
+        r"^enhancements?$|^new\s+features?(?:\s+and\s+enhancements?)?$", re.I
+    ),
+    # "Software Issues Resolved" is modern; older pages used "Issues Resolved"
+    # or "Resolved Issues" with no "Software" prefix.
+    "defect":      re.compile(
+        r"software\s+issues?\s+resolved|^issues?\s+resolved$|^resolved\s+issues?$", re.I
+    ),
     "security":    re.compile(r"security\s+enhancements?", re.I),
 }
 # \s* (not \s+) handles "Defect1541790:" (no space between keyword and number),
@@ -332,22 +399,58 @@ SECTION_PATTERNS = {
 DEFECT_RE            = re.compile(r"Defect\s*(\d+)\s*[:–-]\s*(.*)", re.DOTALL | re.IGNORECASE)
 BREADCRUMB_SEP_RE    = re.compile(r"\s*>>\s*")
 PAGE_LAST_UPDATED_RE = re.compile(
-    r"Last\s+Updated\s*:\s*([A-Za-z]+ \d{1,2},\s*\d{4})", re.IGNORECASE
+    # Handles all observed variants:
+    #   "October 3, 2022"    — normal
+    #   "October 3 , 2022"   — space before comma (seen in 5.5.1, 2025.3.8)
+    #   "October 3\xa0, 2022" — non-breaking space before comma
+    #   "October 3 2022"     — no comma at all (rare)
+    r"Last\s+Updated\s*:\s*([A-Za-z]+\s+\d{1,2}[\s\xa0]*,?[\s\xa0]*\d{4})",
+    re.IGNORECASE,
 )
-# Maximum length for a single-level breadcrumb (no '>>'). Real Vantagepoint
-# module names: "API" (3), "Billing" (7), "Ask Dela" (8), "Dashboards" (10),
-# "Resource Management" (19), "Deltek Learning Hub" (19) — all well under 25.
-# Enhancement/regulatory titles like "New API Endpoint for Report Generation"
-# (38) or "Federal Income Tax Withholding 2025 Updates" (43) exceed this and
-# must NOT be treated as breadcrumbs.
-_MAX_SINGLE_LEVEL_BC = 25
+
+# Max word count for a standalone module heading (no '>>' separator) per section.
+# Enhancement modules: "Batch Billing and Interactive Billing" = 5 words (longest seen)
+# Regulatory headings: jurisdiction names like "Federal", "New Mexico" — ≤ 2 words
+# Security headings:  area names like "API" — ≤ 2 words
+# Defect standalone:  "Search", "Payroll" — single word in practice, allow 2 for safety
+_SECTION_WORD_LIMIT: dict[str, int] = {
+    "enhancement": 5,
+    "regulatory":  2,
+    "security":    2,
+    "defect":      2,
+}
+
+# Bold paragraphs whose text matches this pattern are enhancement/regulatory TITLES,
+# not module headings — even when their word count is ≤ _SECTION_WORD_LIMIT.
+# Verb phrases and adverbs that open action sentences never appear as module names.
+_TITLE_PREFIX_RE = re.compile(
+    r"^(?:New\s|Updated?\s|Improved\s|Enhanced\s|Added?\s|"
+    r"Ability\s+to\s|Option\s+to\s|"
+    r"Electronically\s|Automatically\s|Manually\s|Digitally\s|"
+    r"Track\s|Warn\s|Expose\s|Allow\s|Enable\s|Disable\s|Enforce\s|"
+    r"Support\s|Use\s|Access\s|View\s|Run\s|Send\s|Email\s|"
+    r"Create\s|Add\s|Remove\s|Delete\s|Edit\s|Filter\s|Sort\s|"
+    r"Print\s|Export\s|Import\s|Upload\s|Download\s|Sign\s)",
+    re.I
+)
+
+# Backwards-compatible alias (used in tests)
+_MAX_MODULE_NAME_WORDS = max(_SECTION_WORD_LIMIT.values())
 
 
 def parse_date(raw: str) -> str | None:
     if not raw:
         return None
-    raw = raw.strip().strip("-").strip()
-    for fmt in ("%B %d, %Y", "%b %d, %Y", "%B %Y"):
+    # Normalise: collapse all whitespace (incl. non-breaking space \xa0), then
+    # remove whitespace before comma, then insert comma when digit-space-year.
+    # This handles every variant seen on Deltek pages:
+    #   "October 3 , 2022"   → "October 3, 2022"
+    #   "October 3\xa0, 2022" → "October 3, 2022"
+    #   "October 3 2022"     → "October 3, 2022"
+    raw = re.sub(r"[\s\xa0]+", " ", raw).strip()   # collapse / normalise whitespace
+    raw = re.sub(r"\s+,", ",", raw)                # "3 ," → "3,"
+    raw = re.sub(r"(\d)\s+(\d{4})$", r"\1, \2", raw)  # "3 2022" → "3, 2022"
+    for fmt in ("%B %d, %Y", "%b %d, %Y", "%B %Y", "%b %Y"):
         try:
             return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
         except ValueError:
@@ -366,6 +469,45 @@ def parse_breadcrumb(raw: str) -> tuple[str, str, str, str]:
     l2 = parts[1] if len(parts) > 1 else ""
     l3 = parts[2] if len(parts) > 2 else ""
     return " >> ".join(p for p in parts if p), l1, l2, l3
+
+
+# Section types whose parsed heading labels (e.g. "Federal", "Payroll",
+# "California") are jurisdiction/topic names rather than app module names.
+# For these sections the section name becomes nav_level1 so that all entries
+# are grouped under a single "Regulatory" or "Security" node in the sidebar,
+# keeping it separate from application area names like "Hubs" and "Billing".
+SECTION_NAV_LABEL: dict[str, str] = {
+    "regulatory": "Regulatory",
+    "security":   "Security",
+}
+
+
+def _nav_for_section(
+    section: str, nav1: str, nav2: str, nav3: str
+) -> tuple[str, str, str, str]:
+    """
+    Return (breadcrumb, nav_level1, nav_level2, nav_level3) for an issue,
+    remapping the hierarchy when the section uses its own top-level grouping.
+
+    Regulatory / Security — shift parsed labels down one level:
+        parsed  nav1="Federal"  nav2=""       nav3=""
+        returns ("Regulatory >> Federal", "Regulatory", "Federal", "")
+
+        parsed  nav1="Payroll"  nav2="Federal" nav3=""
+        returns ("Regulatory >> Payroll >> Federal", "Regulatory", "Payroll", "Federal")
+
+    Enhancement / Defect — pass through unchanged.
+    """
+    label = SECTION_NAV_LABEL.get(section)
+    if not label:
+        bc = " >> ".join(p for p in [nav1, nav2, nav3] if p)
+        return bc, nav1, nav2, nav3
+
+    new1 = label
+    new2 = nav1   # e.g. "Federal", "Payroll", "State"
+    new3 = nav2   # sub-jurisdiction if present
+    bc   = " >> ".join(p for p in [new1, new2, new3] if p)
+    return bc, new1, new2, new3
 
 
 def parse_html(html: str) -> tuple[list[dict], str | None]:
@@ -415,30 +557,52 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
 
             # ── 2. Detect breadcrumb / category headers ───────────────────
             #
-            # A tag is a breadcrumb header when it meets ALL of:
-            #   a) Does not match DEFECT_RE (guards against bold defect numbers
-            #      like <strong>Defect1541790</strong> slipping through)
-            #   b) Either has '>>' separator (any length allowed), OR is a
-            #      purely-bold standalone heading ≤ 40 chars (module names like
-            #      "Federal", "Billing", "Ask Dela" – NOT enhancement titles)
+            # A tag becomes a module-level breadcrumb heading when it meets ANY of:
+            #   a) Contains '>>' separator (always a breadcrumb, any length)
+            #   b) Is a purely-bold standalone paragraph whose word count is within
+            #      the section-specific limit AND doesn't start with a known title
+            #      verb/adverb prefix (e.g. "Electronically", "New ", "Ability to")
+            #   c) Is a plain (non-bold) short paragraph in the enhancement section —
+            #      used in older (2.0–4.x) pages where module headings were plain <p>
             #
-            # is_heading_only: the <strong>/<b> text IS the entire tag text.
-            # This rejects cases like:
-            #   <p><strong>Defect1541790</strong>: long description...</p>
-            #   → bold text ≠ full text → not a breadcrumb
-            # And cases like:
-            #   <p><strong>Federal Income Tax Withholding 2025 Updates</strong></p>
-            #   → bold == full text BUT len > 40 → not a breadcrumb
-            bold         = tag.find(["strong", "b"])
-            has_sep      = ">>" in text
+            # Section-specific word limits (_SECTION_WORD_LIMIT):
+            #   enhancement: 5  ("Batch Billing and Interactive Billing" = 5 words)
+            #   regulatory:  2  (jurisdiction names: "Federal", "New Mexico")
+            #   security:    2  (area names: "API")
+            #   defect:      2  ("Search", "Payroll" — single-word in practice)
+            #
+            # _TITLE_PREFIX_RE excludes verb/adverb phrases that are always titles:
+            #   "Electronically Sign Timesheet Submissions" → title (not module)
+            #   "New API Endpoint for Report Generation"   → title (not module)
+            bold        = tag.find(["strong", "b"])
+            has_sep     = ">>" in text
+            word_count  = len(text.split())
+            word_limit  = _SECTION_WORD_LIMIT.get(current_section, 0)
             is_heading_only = (
                 bold is not None
                 and clean_text(bold.get_text()) == clean_text(text)
             )
+            is_title_prefix = bool(_TITLE_PREFIX_RE.match(text))
+            looks_like_module = (
+                word_count <= word_limit and not is_title_prefix
+            )
+            # Plain heading: enhancement section only, older page format
+            is_plain_module = (
+                bold is None
+                and current_section == "enhancement"
+                and word_count <= word_limit
+                and not is_title_prefix
+                and text[-1:] not in ".!?"
+                and not re.match(
+                    r"^(Last Updated|Release Date|Welcome|These release|"
+                    r"For more|Skip the|The following|If you)", text, re.I
+                )
+            )
 
             if not DEFECT_RE.match(text) and (
                 has_sep
-                or (is_heading_only and len(text) <= _MAX_SINGLE_LEVEL_BC)
+                or (is_heading_only and looks_like_module)
+                or is_plain_module
             ):
                 if has_sep:
                     bc, l1, l2, l3 = parse_breadcrumb(text)
@@ -464,14 +628,15 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
             desc  = clean_text(dm.group(2))
             tm    = re.match(r"^(.{10,200}?[.!?])\s", desc)
             title = tm.group(1) if tm else desc[:200]
+            bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
             issues.append({
-                "type": "defect",          "defect_number": dm.group(1),
-                "breadcrumb": breadcrumb,  "nav_level1": nav1,
-                "nav_level2": nav2,        "nav_level3": nav3,
-                "category": nav1,          "subcategory": nav2,
-                "title": title,            "description": desc,
+                "type": "defect",  "defect_number": dm.group(1),
+                "breadcrumb": bc,  "nav_level1": n1,
+                "nav_level2": n2,  "nav_level3": n3,
+                "category": n1,    "subcategory": n2,
+                "title": title,    "description": desc,
             })
-            pending_title = None   # defects never accumulate a pending title
+            pending_title = None
             continue
 
         if current_section in ("enhancement", "regulatory", "security"):
@@ -479,10 +644,12 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 continue
 
             bold        = tag.find(["strong", "b"])
+            word_count  = len(text.split())
+            word_limit  = _SECTION_WORD_LIMIT.get(current_section, 0)
             is_title    = (
                 bold is not None
                 and clean_text(bold.get_text()) == clean_text(text)
-                and len(text) > _MAX_SINGLE_LEVEL_BC  # short ones were already breadcrumbs
+                and (word_count > word_limit or bool(_TITLE_PREFIX_RE.match(text)))
             )
 
             if is_title:
@@ -491,11 +658,12 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 # then hold this one until we see its description paragraph.
                 if pending_title:
                     tm = re.match(r"^(.{10,200}?[.!?])\s", pending_title)
+                    bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
                     issues.append({
-                        "type": current_section,  "defect_number": None,
-                        "breadcrumb": breadcrumb,  "nav_level1": nav1,
-                        "nav_level2": nav2,        "nav_level3": nav3,
-                        "category": nav1,          "subcategory": nav2,
+                        "type": current_section, "defect_number": None,
+                        "breadcrumb": bc,         "nav_level1": n1,
+                        "nav_level2": n2,         "nav_level3": n3,
+                        "category": n1,           "subcategory": n2,
                         "title": tm.group(1) if tm else pending_title[:200],
                         "description": pending_title,
                     })
@@ -505,11 +673,12 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 if pending_title:
                     # Merge: the pending bold title is the issue title, this is the desc.
                     tm = re.match(r"^(.{10,200}?[.!?])\s", pending_title)
+                    bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
                     issues.append({
-                        "type": current_section,  "defect_number": None,
-                        "breadcrumb": breadcrumb,  "nav_level1": nav1,
-                        "nav_level2": nav2,        "nav_level3": nav3,
-                        "category": nav1,          "subcategory": nav2,
+                        "type": current_section, "defect_number": None,
+                        "breadcrumb": bc,         "nav_level1": n1,
+                        "nav_level2": n2,         "nav_level3": n3,
+                        "category": n1,           "subcategory": n2,
                         "title": tm.group(1) if tm else pending_title[:200],
                         "description": text,
                     })
@@ -517,11 +686,12 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 else:
                     # No pending title: first sentence becomes title as before.
                     tm = re.match(r"^(.{10,200}?[.!?])\s", text)
+                    bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
                     issues.append({
-                        "type": current_section,  "defect_number": None,
-                        "breadcrumb": breadcrumb,  "nav_level1": nav1,
-                        "nav_level2": nav2,        "nav_level3": nav3,
-                        "category": nav1,          "subcategory": nav2,
+                        "type": current_section, "defect_number": None,
+                        "breadcrumb": bc,         "nav_level1": n1,
+                        "nav_level2": n2,         "nav_level3": n3,
+                        "category": n1,           "subcategory": n2,
                         "title": tm.group(1) if tm else text[:200],
                         "description": text,
                     })
@@ -529,11 +699,12 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
     # Flush any trailing pending title (last item on page with no following paragraph)
     if pending_title and current_section in ("enhancement", "regulatory", "security"):
         tm = re.match(r"^(.{10,200}?[.!?])\s", pending_title)
+        bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
         issues.append({
-            "type": current_section,  "defect_number": None,
-            "breadcrumb": breadcrumb,  "nav_level1": nav1,
-            "nav_level2": nav2,        "nav_level3": nav3,
-            "category": nav1,          "subcategory": nav2,
+            "type": current_section, "defect_number": None,
+            "breadcrumb": bc,         "nav_level1": n1,
+            "nav_level2": n2,         "nav_level3": n3,
+            "category": n1,           "subcategory": n2,
             "title": tm.group(1) if tm else pending_title[:200],
             "description": pending_title,
         })
@@ -798,19 +969,24 @@ def run(
     conn  = get_db(DB_PATH)
     log.info("DB: %s%s", DB_PATH, "  [DRY-RUN]" if dry_run else "")
 
-    # --- Collect & filter releases ---
-    all_urls = INDEX_URLS
+    # --- Discover & collect releases ---
+    all_index_urls = discover_index_urls()
     if versions_filter:
-        all_urls = [u for u in all_urls if any(f"/{v}/" in u for v in versions_filter)]
+        all_index_urls = [
+            u for u in all_index_urls
+            if any(f"/{v}/" in u for v in versions_filter)
+        ]
+        if not all_index_urls:
+            log.warning("No index URLs matched versions filter %s", versions_filter)
 
     releases: list[dict] = []
-    for idx_url in all_urls:
+    for idx_url in all_index_urls:
         releases.extend(parse_index_page(idx_url))
 
     if since:
-        releases = [r for r in releases if r.get("release_date","") >= since.isoformat()]
+        releases = [r for r in releases if r.get("release_date", "") >= since.isoformat()]
 
-    releases.sort(key=lambda r: r.get("release_date",""), reverse=True)
+    releases.sort(key=lambda r: r.get("release_date", ""), reverse=True)
 
     if max_releases:
         releases = releases[:max_releases]
