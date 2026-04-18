@@ -289,6 +289,11 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
 .amended-badge{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;
   border-radius:3px;font-family:var(--mono);font-size:.62rem;
   background:var(--por-bg);color:var(--por);border:1px solid rgba(255,154,60,.15)}
+.permalink-btn{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;
+  border-radius:3px;font-family:var(--mono);font-size:.62rem;cursor:pointer;
+  background:var(--bg2);color:var(--dim);border:1px solid var(--bdr);
+  transition:color .15s,border-color .15s}
+.permalink-btn:hover{color:var(--acc);border-color:var(--acc)}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -392,14 +397,13 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
       <div class="tf" data-type="defect"><div class="dot" style="background:var(--def)"></div>Defects<span class="cnt" id="cnt-defect">—</span></div>
       <div class="tf" data-type="enhancement"><div class="dot" style="background:var(--enh)"></div>Enhancements<span class="cnt" id="cnt-enhancement">—</span></div>
       <div class="tf" data-type="regulatory"><div class="dot" style="background:var(--reg)"></div>Regulatory<span class="cnt" id="cnt-regulatory">—</span></div>
-      <div class="tf" data-type="security"><div class="dot" style="background:var(--sec)"></div>Security<span class="cnt" id="cnt-security">—</span></div>
       <div class="tf" data-type="ported" style="border-top:1px solid var(--bdr);margin-top:4px">
         <div class="dot" style="background:var(--por)"></div>Ported Defects<span class="cnt" id="cnt-ported">—</span>
       </div>
-      <div class="sb-label" style="margin-top:12px">Application Area</div>
-      <div class="bc-tree" id="bc-tree"></div>
       <div class="sb-label" style="margin-top:12px">Version</div>
       <div class="v-tree" id="v-tree"></div>
+      <div class="sb-label" style="margin-top:12px">Application Area</div>
+      <div class="bc-tree" id="bc-tree"></div>
     </nav>
 
     <div id="main">
@@ -439,7 +443,7 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
 <script>
 "use strict";
 // ── CONFIG ────────────────────────────────────────────────────────────────
-const DB_URL      = "./release_notes.db?v=59865eb8242c29c5f466e6c5487cf5a68efb54a6";
+const DB_URL      = "./release_notes.db?v=dc7e764b8a874f9cf38fecc39210be74c56dfde0";
 const SQLJS_JS    = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js";
 const SQLJS_WASM  = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm";
 const PAGE_SIZE   = 250;   // rows per page
@@ -504,14 +508,26 @@ function Q1(sql, params = []) {
   return Q(sql, params).then(rows => rows[0] || null);
 }
 
+// ── NAV1 NORMALIZATION ────────────────────────────────────────────────────
+const NAV1_ALIASES = {
+  'APIs': 'API',
+  // add more as Deltek inconsistencies are discovered
+};
+function canonNav1(raw) {
+  let s = raw && raw.includes(':') ? raw.split(':')[0].trim() : (raw || '');
+  return NAV1_ALIASES[s] ?? s;
+}
+
 // ── STATE ─────────────────────────────────────────────────────────────────
 let totalRows = [];   // all matching rows from last query
 let page = 0;
 let expandedIdx = null;
 let sortCol = "release_date", sortDir = "desc";
 let filterType = "all";
-let filterVersion = null;
-let filterNav1 = null, filterNav2 = null, filterNav3 = null;
+let filterVersions = new Set();    // multi-select patch versions
+let filterNavItems = [];           // multi-select nav: [{l1, l2, l3}]
+let filterIssueId = null;          // permalink: load a single issue by id
+let nav1RawMap = new Map();       // canonical nav1 name → Set of raw DB values
 let searchQ = "";
 let searchTimer = null;
 
@@ -571,14 +587,7 @@ async function init() {
     const hadHash = applyHash();
     if (hadHash) {
       refreshNavHighlight();
-      if (filterVersion) {
-        const btn = document.querySelector(`.v-patch-btn[data-version="${CSS.escape(filterVersion)}"]`);
-        if (btn) {
-          btn.classList.add("sel");
-          const patches = btn.closest(".v-patches");
-          if (patches) patches.previousElementSibling?.classList.add("open");
-        }
-      }
+      refreshVersionHighlight();
     }
 
     await runQuery();
@@ -596,19 +605,45 @@ async function init() {
 
 // ── SIDEBAR: breadcrumb tree ──────────────────────────────────────────────
 async function buildBcTree() {
-  const rows = await Q(`
-    SELECT DISTINCT nav_level1, nav_level2, nav_level3, COUNT(*) n
-    FROM issues WHERE nav_level1 != ''
-    GROUP BY nav_level1, nav_level2, nav_level3
-    ORDER BY nav_level1, nav_level2, nav_level3`);
+  let sql, sqlParams = [];
+  if (filterType === 'ported') {
+    sql = `SELECT DISTINCT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(*) n
+           FROM issues i WHERE i.nav_level1 != ''
+             AND i.defect_number IS NOT NULL
+             AND (SELECT COUNT(*) FROM issue_versions iv WHERE iv.issue_id=i.id)>1
+           GROUP BY i.nav_level1, i.nav_level2, i.nav_level3
+           ORDER BY i.nav_level1, i.nav_level2, i.nav_level3`;
+  } else if (filterType !== 'all') {
+    sql = `SELECT DISTINCT nav_level1, nav_level2, nav_level3, COUNT(*) n
+           FROM issues WHERE nav_level1 != '' AND type=?
+           GROUP BY nav_level1, nav_level2, nav_level3
+           ORDER BY nav_level1, nav_level2, nav_level3`;
+    sqlParams = [filterType];
+  } else {
+    sql = `SELECT DISTINCT nav_level1, nav_level2, nav_level3, COUNT(*) n
+           FROM issues WHERE nav_level1 != ''
+           GROUP BY nav_level1, nav_level2, nav_level3
+           ORDER BY nav_level1, nav_level2, nav_level3`;
+  }
+  const rows = await Q(sql, sqlParams);
 
+  // Build canonical→raw mapping for filter queries
+  nav1RawMap = new Map();
+  for (const r of rows) {
+    const canon = canonNav1(r.nav_level1);
+    if (!nav1RawMap.has(canon)) nav1RawMap.set(canon, new Set());
+    nav1RawMap.get(canon).add(r.nav_level1);
+  }
+
+  // Build tree using canonical nav1 names (merges duplicates like API/APIs)
   const tree = {};
   for (const r of rows) {
-    if (!tree[r.nav_level1]) tree[r.nav_level1] = {};
+    const l1 = canonNav1(r.nav_level1);
+    if (!tree[l1]) tree[l1] = {};
     const l2 = r.nav_level2 || "";
-    if (!tree[r.nav_level1][l2]) tree[r.nav_level1][l2] = { n: 0, l3s: {} };
-    tree[r.nav_level1][l2].n += r.n;
-    if (r.nav_level3) tree[r.nav_level1][l2].l3s[r.nav_level3] = r.n;
+    if (!tree[l1][l2]) tree[l1][l2] = { n: 0, l3s: {} };
+    tree[l1][l2].n += r.n;
+    if (r.nav_level3) tree[l1][l2].l3s[r.nav_level3] = (tree[l1][l2].l3s[r.nav_level3] || 0) + r.n;
   }
 
   const cont = document.getElementById("bc-tree");
@@ -623,7 +658,7 @@ async function buildBcTree() {
     l1btn.innerHTML = `${hasL2 ? `<span class="arr">▶</span>` : `<span style="width:10px"></span>`}
       <span class="l1d"></span><span style="flex:1;text-align:left">${esc(l1)}</span>
       <span class="bc-cnt">${l1cnt}</span>`;
-    l1btn.onclick = () => { if(hasL2) l1btn.classList.toggle("open"); setNavFilter(l1, null, null, l1btn); };
+    l1btn.onclick = () => { if(hasL2) l1btn.classList.toggle("open"); setNavFilter(l1, null, null); };
 
     const l2list = document.createElement("div"); l2list.className = "l2-list";
     for (const [l2, { n: l2n, l3s }] of Object.entries(l2map).sort()) {
@@ -634,12 +669,12 @@ async function buildBcTree() {
       l2btn.innerHTML = `${hasL3 ? `<span class="arr">▶</span>` : `<span style="width:10px"></span>`}
         <span class="l2d"></span><span style="flex:1;text-align:left">${esc(l2)}</span>
         <span class="bc-cnt">${l2n}</span>`;
-      l2btn.onclick = () => { if(hasL3) l2btn.classList.toggle("open"); setNavFilter(l1, l2, null, l2btn); };
+      l2btn.onclick = () => { if(hasL3) l2btn.classList.toggle("open"); setNavFilter(l1, l2, null); };
       const l3list = document.createElement("div"); l3list.className = "l3-list";
       for (const [l3, l3n] of Object.entries(l3s).sort()) {
         const l3btn = document.createElement("button"); l3btn.className = "l3-btn"; l3btn.dataset.l3 = l3;
         l3btn.innerHTML = `<span class="l3d"></span><span style="flex:1;text-align:left">${esc(l3)}</span><span class="bc-cnt">${l3n}</span>`;
-        l3btn.onclick = () => setNavFilter(l1, l2, l3, l3btn);
+        l3btn.onclick = () => setNavFilter(l1, l2, l3);
         l3list.appendChild(l3btn);
       }
       l2w.appendChild(l2btn); if(hasL3) l2w.appendChild(l3list);
@@ -650,21 +685,33 @@ async function buildBcTree() {
   }
 }
 
-function setNavFilter(l1, l2, l3, btn) {
-  const same = filterNav1 === l1 && filterNav2 === l2 && filterNav3 === l3;
-  filterNav1 = same ? null : l1;
-  filterNav2 = same ? null : l2;
-  filterNav3 = same ? null : l3;
+function setNavFilter(l1, l2, l3) {
+  const idx = filterNavItems.findIndex(f => f.l1 === l1 && f.l2 === l2 && f.l3 === l3);
+  if (idx >= 0) filterNavItems.splice(idx, 1);
+  else filterNavItems.push({ l1, l2, l3 });
   refreshNavHighlight();
   triggerQuery();
 }
 
-function clearNavFilter() { filterNav1 = filterNav2 = filterNav3 = null; refreshNavHighlight(); triggerQuery(); }
+function clearNavFilter() { filterNavItems = []; refreshNavHighlight(); triggerQuery(); }
 
 function refreshNavHighlight() {
-  document.querySelectorAll(".l1-btn").forEach(b => { b.classList.remove("sel"); if(b.dataset.l1===filterNav1) b.classList.add("sel","open"); });
-  document.querySelectorAll(".l2-btn").forEach(b => { b.classList.remove("sel"); if(filterNav2&&b.dataset.l2===filterNav2) b.classList.add("sel","open"); });
-  document.querySelectorAll(".l3-btn").forEach(b => { b.classList.remove("sel"); if(filterNav3&&b.dataset.l3===filterNav3) b.classList.add("sel"); });
+  document.querySelectorAll(".l1-btn").forEach(b => {
+    const sel = filterNavItems.some(f => f.l1 === b.dataset.l1);
+    b.classList.toggle("sel", sel);
+    if (sel || filterNavItems.some(f => f.l1 === b.dataset.l1 && f.l2)) b.classList.add("open");
+  });
+  document.querySelectorAll(".l2-btn").forEach(b => {
+    const l1 = b.closest(".l1-wrap")?.querySelector(".l1-btn")?.dataset.l1;
+    const sel = filterNavItems.some(f => f.l1 === l1 && f.l2 === b.dataset.l2);
+    b.classList.toggle("sel", sel);
+    if (sel || filterNavItems.some(f => f.l1 === l1 && f.l2 === b.dataset.l2 && f.l3)) b.classList.add("open");
+  });
+  document.querySelectorAll(".l3-btn").forEach(b => {
+    const l1 = b.closest(".l1-wrap")?.querySelector(".l1-btn")?.dataset.l1;
+    const l2 = b.closest(".l2-wrap")?.querySelector(".l2-btn")?.dataset.l2;
+    b.classList.toggle("sel", filterNavItems.some(f => f.l1 === l1 && f.l2 === l2 && f.l3 === b.dataset.l3));
+  });
 }
 
 // ── SIDEBAR: version tree ─────────────────────────────────────────────────
@@ -699,8 +746,9 @@ async function buildVersionTree() {
       pb.className = "v-patch-btn"; pb.dataset.version = p.patch_version;
       pb.innerHTML = `<span>${esc(p.patch_version)}</span><span class="bc-cnt">${p.n}</span>`;
       pb.onclick = () => {
-        if (filterVersion === p.patch_version) { filterVersion = null; pb.classList.remove("sel"); }
-        else { document.querySelectorAll(".v-patch-btn").forEach(b=>b.classList.remove("sel")); filterVersion = p.patch_version; pb.classList.add("sel"); }
+        if (filterVersions.has(p.patch_version)) filterVersions.delete(p.patch_version);
+        else filterVersions.add(p.patch_version);
+        refreshVersionHighlight();
         triggerQuery();
       };
       pList.appendChild(pb);
@@ -708,6 +756,18 @@ async function buildVersionTree() {
     cont.appendChild(majBtn);
     cont.appendChild(pList);
   }
+}
+
+function refreshVersionHighlight() {
+  document.querySelectorAll(".v-patch-btn").forEach(b => {
+    b.classList.toggle("sel", filterVersions.has(b.dataset.version));
+  });
+  // Auto-open major version groups that have a selected patch
+  document.querySelectorAll(".v-patches").forEach(pList => {
+    if ([...pList.querySelectorAll(".v-patch-btn")].some(b => filterVersions.has(b.dataset.version))) {
+      pList.previousElementSibling?.classList.add("open");
+    }
+  });
 }
 
 // ── COUNTS ────────────────────────────────────────────────────────────────
@@ -725,6 +785,7 @@ async function updateCounts() {
 // ── QUERY ─────────────────────────────────────────────────────────────────
 // triggerQuery: debounced, shows spinner, updates URL hash after query
 function triggerQuery() {
+  filterIssueId = null;  // any manual filter action exits permalink mode
   clearTimeout(searchTimer);
   document.getElementById("search-spinner").style.display = "block";
   searchTimer = setTimeout(async () => {
@@ -736,17 +797,35 @@ function triggerQuery() {
 async function runQuery() {
   const conds = [], params = [];
 
-  if (searchQ.trim()) {
-    const q = searchQ.trim().replace(/['"]/g, "");
-    conds.push("i.id IN (SELECT rowid FROM issues_fts WHERE issues_fts MATCH ?)");
-    params.push(`"${q}"*`);
+  if (filterIssueId) {
+    conds.push("i.id=?");
+    params.push(filterIssueId);
+  } else {
+    if (searchQ.trim()) {
+      const q = searchQ.trim().replace(/['"]/g, "");
+      conds.push("i.id IN (SELECT rowid FROM issues_fts WHERE issues_fts MATCH ?)");
+      params.push(`"${q}"*`);
+    }
+    if (filterType !== "all" && filterType !== "ported") { conds.push("i.type=?"); params.push(filterType); }
+    if (filterType === "ported") { conds.push("(SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1"); conds.push("i.defect_number IS NOT NULL"); }
+    if (filterVersions.size > 0) {
+      const ph = [...filterVersions].map(() => '?').join(',');
+      conds.push(`r.patch_version IN (${ph})`);
+      params.push(...filterVersions);
+    }
+    if (filterNavItems.length > 0) {
+      const navConds = filterNavItems.map(f => {
+        const rawVals = [...(nav1RawMap.get(f.l1) || new Set([f.l1]))];
+        const ph = rawVals.map(() => '?').join(',');
+        const sub = [`i.nav_level1 IN (${ph})`];
+        params.push(...rawVals);
+        if (f.l2) { sub.push('i.nav_level2=?'); params.push(f.l2); }
+        if (f.l3) { sub.push('i.nav_level3=?'); params.push(f.l3); }
+        return `(${sub.join(' AND ')})`;
+      });
+      conds.push(`(${navConds.join(' OR ')})`);
+    }
   }
-  if (filterType !== "all" && filterType !== "ported") { conds.push("i.type=?"); params.push(filterType); }
-  if (filterType === "ported") { conds.push("(SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1"); conds.push("i.defect_number IS NOT NULL"); }
-  if (filterVersion) { conds.push("r.patch_version=?"); params.push(filterVersion); }
-  if (filterNav1)    { conds.push("i.nav_level1=?");    params.push(filterNav1); }
-  if (filterNav2)    { conds.push("i.nav_level2=?");    params.push(filterNav2); }
-  if (filterNav3)    { conds.push("i.nav_level3=?");    params.push(filterNav3); }
 
   const where = conds.length ? `AND ${conds.join(" AND ")}` : "";
 
@@ -787,6 +866,7 @@ async function runQuery() {
   expandedIdx = null;
   renderPage();
   renderChips();
+  if (filterIssueId && totalRows.length === 1) toggleDetail(0);
   renderPagination();
 }
 
@@ -840,7 +920,7 @@ function renderPage() {
       <tr data-idx="${idx}" onclick="toggleDetail(${idx})">
         <td><span class="vbadge">${esc(r.patch_version)}</span></td>
         <td><span class="tbadge ${r.type}">${TYPE_LABEL[r.type] || r.type}</span></td>
-        <td>${bcHtml(r.nav_level1, r.nav_level2, r.nav_level3, q)}</td>
+        <td>${bcHtml(canonNav1(r.nav_level1), r.nav_level2, r.nav_level3, q)}</td>
         <td>${r.defect_number ? `<span class="dnum">#${r.defect_number}</span>` : ""}${hl(r.title, q)}</td>
         <td>${ported ? `<span class="pbadge">⇢ ${r.version_count}</span>` : `<span style="color:var(--dim);font-family:var(--mono);font-size:.65rem">—</span>`}</td>
         <td style="font-family:var(--mono);font-size:.65rem;color:var(--dim)">${fmtDate(r.release_date)}</td>
@@ -875,7 +955,7 @@ async function toggleDetail(idx) {
     `<span class="vci${v.patch_version === r.patch_version ? " cur" : ""}">${esc(v.patch_version)}</span>`
   ).join(`<span style="color:var(--dim);font-size:.6rem;margin:0 1px">→</span>`);
 
-  let bcd = r.nav_level1 ? `<span class="bs1">${esc(r.nav_level1)}</span>` : "";
+  let bcd = r.nav_level1 ? `<span class="bs1">${esc(canonNav1(r.nav_level1))}</span>` : "";
   if (r.nav_level2) bcd += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bs2">${esc(r.nav_level2)}</span>`;
   if (r.nav_level3) bcd += `<span style="color:var(--dim);margin:0 4px;font-size:.65rem">›</span><span class="bs3">${esc(r.nav_level3)}</span>`;
 
@@ -897,10 +977,20 @@ async function toggleDetail(idx) {
         ${r.version_count > 1 ? `<span style="color:var(--por)"><b>Ported</b> ${r.version_count} versions</span>` : ""}
         ${amendedBadge}
         ${r.release_url ? `<a href="${esc(r.release_url)}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:.65rem">↗ Release Notes</a>` : ""}
+        <button class="permalink-btn" title="Copy permalink" onclick="copyPermalink(${r.id}, this)">⌗ Permalink</button>
       </div>
       <div class="d-desc">${esc(r.description || r.title)}</div>
       ${versions.length > 1 ? `<div class="vcl">VERSION HISTORY</div><div class="v-chain">${chainHtml}</div>` : ""}
     </div>`;
+}
+
+function copyPermalink(issueId, btn) {
+  const url = location.origin + location.pathname + '#issue=' + issueId;
+  navigator.clipboard.writeText(url).catch(() => {});
+  history.replaceState(null, "", '#issue=' + issueId);
+  const orig = btn.textContent;
+  btn.textContent = "✓ Copied!";
+  setTimeout(() => { btn.textContent = orig; }, 1500);
 }
 
 // ── PAGINATION ────────────────────────────────────────────────────────────
@@ -934,22 +1024,31 @@ document.getElementById("pg-last").onclick  = () => goPage(Infinity);
 // ── CHIPS ─────────────────────────────────────────────────────────────────
 function renderChips() {
   const c = document.getElementById("chips"); c.innerHTML = "";
+  if (filterIssueId) {
+    addChip(c, `Issue #${filterIssueId}`, "--acc", () => { filterIssueId = null; triggerQuery(); });
+    return;
+  }
   if (filterType !== "all") {
     const col = filterType === "ported" ? "--por" : `--${filterType}`;
     addChip(c, TYPE_LABEL[filterType] || filterType, col, () => {
       filterType = "all"; document.querySelectorAll(".tf").forEach(x => x.classList.remove("act"));
-      document.querySelector('.tf[data-type="all"]').classList.add("act"); triggerQuery();
+      document.querySelector('.tf[data-type="all"]').classList.add("act");
+      buildBcTree(); triggerQuery();
     });
   }
-  if (filterNav1) {
-    let label = filterNav1;
-    if (filterNav2) label += ` › ${filterNav2}`;
-    if (filterNav3) label += ` › ${filterNav3}`;
-    addChip(c, label, "--l1", clearNavFilter, "l1c");
+  for (const f of filterNavItems) {
+    let label = f.l1;
+    if (f.l2) label += ` › ${f.l2}`;
+    if (f.l3) label += ` › ${f.l3}`;
+    const fi = f; // capture for closure
+    addChip(c, label, "--l1", () => {
+      filterNavItems = filterNavItems.filter(x => !(x.l1===fi.l1 && x.l2===fi.l2 && x.l3===fi.l3));
+      refreshNavHighlight(); triggerQuery();
+    }, "l1c");
   }
-  if (filterVersion) {
-    addChip(c, `v${filterVersion}`, "--acc", () => {
-      filterVersion = null; document.querySelectorAll(".v-patch-btn").forEach(b => b.classList.remove("sel")); triggerQuery();
+  for (const ver of filterVersions) {
+    addChip(c, `v${ver}`, "--acc", () => {
+      filterVersions.delete(ver); refreshVersionHighlight(); triggerQuery();
     });
   }
   if (searchQ.trim()) {
@@ -974,7 +1073,8 @@ document.getElementById("search").addEventListener("input", e => {
 document.querySelectorAll(".tf").forEach(el => {
   el.addEventListener("click", () => {
     document.querySelectorAll(".tf").forEach(x => x.classList.remove("act"));
-    el.classList.add("act"); filterType = el.dataset.type; triggerQuery();
+    el.classList.add("act"); filterType = el.dataset.type;
+    buildBcTree(); triggerQuery();
   });
 });
 
@@ -1116,12 +1216,14 @@ function toggleCLEntry(idx, e) {
 
 function encodeHash() {
   const p = new URLSearchParams();
-  if (searchQ.trim())       p.set("q",    searchQ.trim());
-  if (filterType !== "all") p.set("type", filterType);
-  if (filterNav1)           p.set("nav1", filterNav1);
-  if (filterNav2)           p.set("nav2", filterNav2);
-  if (filterNav3)           p.set("nav3", filterNav3);
-  if (filterVersion)        p.set("ver",  filterVersion);
+  if (filterIssueId) {
+    p.set("issue", filterIssueId);
+  } else {
+    if (searchQ.trim())          p.set("q",    searchQ.trim());
+    if (filterType !== "all")    p.set("type", filterType);
+    if (filterNavItems.length > 0) p.set("nav", filterNavItems.map(f => [f.l1, f.l2, f.l3].filter(Boolean).join("::")).join("|"));
+    if (filterVersions.size > 0) p.set("ver",  [...filterVersions].join(","));
+  }
   const s = p.toString();
   history.replaceState(null, "", s ? "#" + s : location.pathname + location.search);
 }
@@ -1130,17 +1232,30 @@ function applyHash() {
   const hash = location.hash.slice(1);
   if (!hash) return false;
   const p = new URLSearchParams(hash);
-  searchQ       = p.get("q")    || "";
-  filterType    = p.get("type") || "all";
-  filterNav1    = p.get("nav1") || null;
-  filterNav2    = p.get("nav2") || null;
-  filterNav3    = p.get("nav3") || null;
-  filterVersion = p.get("ver")  || null;
+  if (p.get("issue")) {
+    filterIssueId = parseInt(p.get("issue"), 10);
+    return true;
+  }
+  searchQ      = p.get("q")    || "";
+  filterType   = p.get("type") || "all";
+  // New multi-nav format: nav=API|Billing::Projects
+  // Old single-nav format (backward compat): nav1=API&nav2=Projects
+  filterNavItems = [];
+  const navStr = p.get("nav");
+  if (navStr) {
+    filterNavItems = navStr.split("|").map(item => {
+      const [l1, l2, l3] = item.split("::");
+      return { l1: l1 || null, l2: l2 || null, l3: l3 || null };
+    }).filter(f => f.l1);
+  } else if (p.get("nav1")) {
+    filterNavItems = [{ l1: p.get("nav1"), l2: p.get("nav2") || null, l3: p.get("nav3") || null }];
+  }
+  filterVersions = p.get("ver") ? new Set(p.get("ver").split(",").filter(Boolean)) : new Set();
   document.getElementById("search").value = searchQ;
   document.querySelectorAll(".tf").forEach(el => {
     el.classList.toggle("act", el.dataset.type === filterType);
   });
-  return !!(searchQ || filterType !== "all" || filterNav1 || filterVersion);
+  return !!(searchQ || filterType !== "all" || filterNavItems.length > 0 || filterVersions.size > 0);
 }
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────────
