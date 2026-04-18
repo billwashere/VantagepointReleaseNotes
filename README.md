@@ -11,7 +11,7 @@ A self-updating static website that lets you search and browse all Deltek Vantag
 | | |
 |---|---|
 | 🔍 **Full-text search** | Debounced, non-blocking — queries run in a Web Worker |
-| 🏷️ **Filter by type** | Defects · Enhancements · Regulatory · Security · Ported Defects |
+| 🏷️ **Filter by type** | Defects · Enhancements · Regulatory · Ported Defects |
 | 🗂️ **Application Area tree** | Three-level drill-down matching the in-app navigation breadcrumbs |
 | 🔀 **Ported defect detection** | Same defect number across multiple versions → "⇢ N versions" badge |
 | 📦 **Filter by version** | Drill into any patch release |
@@ -223,4 +223,3 @@ Tests are offline — no network access required. The 30 tests cover:
 
 - **Not affiliated with Deltek.** The underlying release note content is © Deltek Inc.
 - The scraper uses a 0.5 s delay between requests per worker. Please be respectful of Deltek's servers.
-- **Version 7.3** does not exist — Deltek skipped it. It is absent from the master index and from the scraper's fallback list.
