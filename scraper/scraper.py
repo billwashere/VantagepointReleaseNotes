@@ -39,6 +39,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, date
+from typing import NamedTuple
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -544,6 +545,103 @@ def _nav_for_section(
     return bc, new1, new2, new3
 
 
+class _StructuredClasses(NamedTuple):
+    section:    str   # major section heading class
+    breadcrumb: str   # module/nav breadcrumb class
+    body:       str   # one issue per span class
+
+_FORMAT_NEW = _StructuredClasses("Deltek-NewHeading1", "Deltek-NewHeading2", "Deltek-NewNormal")
+_FORMAT_OLD = _StructuredClasses("Deltek-Section",     "Deltek-AreaPath",    "Deltek-Body")
+
+
+def _extract_new_format_title(span_tag) -> str:
+    """Return the title from a structured-format body span.
+
+    The title is the first <p> whose entire visible text is rendered bold —
+    either via a <b>/<strong> child or a <span style="font-weight:bold">.
+    Falls back to the first sentence of the full text.
+    """
+    bq = span_tag.find("blockquote") or span_tag
+    for p in bq.find_all("p", recursive=False):
+        b = p.find(["b", "strong"])
+        if not b:
+            b = p.find("span", style=lambda s: s and "font-weight:bold" in s)
+        if b and clean_text(b.get_text()) == clean_text(p.get_text()):
+            return clean_text(p.get_text())
+    full = clean_text(span_tag.get_text(" ", strip=True))
+    m = re.match(r"^(.{10,200}?[.!?])\s", full)
+    return m.group(1) if m else full[:200]
+
+
+def _parse_structured_format(body, fmt: _StructuredClasses) -> list[dict]:
+    """Parse pages that use explicit Deltek CSS classes (NEW or OLD format).
+
+    Iterates direct body children only, so each body span is treated as exactly
+    one issue rather than being fragmented by the descendants iterator.
+    """
+    issues: list[dict] = []
+    current_section: str | None = None
+    nav1 = nav2 = nav3 = breadcrumb = ""
+
+    for tag in body.children:
+        if not hasattr(tag, "name") or not tag.name:
+            continue
+        cls = tag.get("class") or []
+
+        if fmt.section in cls:
+            text = clean_text(tag.get_text())
+            for sec, pat in SECTION_PATTERNS.items():
+                if pat.search(text):
+                    current_section = sec
+                    nav1 = nav2 = nav3 = breadcrumb = ""
+                    break
+            continue
+
+        if fmt.breadcrumb in cls:
+            if not current_section:
+                continue
+            text = clean_text(tag.get_text())
+            norm = _normalize_sep(text)
+            bc, l1, l2, l3 = parse_breadcrumb(norm)
+            if l1:
+                breadcrumb, nav1, nav2, nav3 = bc, l1, l2, l3
+            continue
+
+        if fmt.body in cls:
+            if not current_section:
+                continue
+            full_text = clean_text(tag.get_text(" ", strip=True))
+            if not full_text or len(full_text) < 10:
+                continue
+
+            if current_section == "defect":
+                dm = DEFECT_RE.match(full_text)
+                if dm:
+                    desc  = clean_text(dm.group(2))
+                    tm    = re.match(r"^(.{10,200}?[.!?])\s", desc)
+                    title = tm.group(1) if tm else desc[:200]
+                    bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
+                    issues.append({
+                        "type": "defect", "defect_number": dm.group(1),
+                        "breadcrumb": bc, "nav_level1": n1,
+                        "nav_level2": n2, "nav_level3": n3,
+                        "category": n1,  "subcategory": n2,
+                        "title": title,  "description": desc,
+                    })
+            else:
+                title = _extract_new_format_title(tag)
+                bc, n1, n2, n3 = _nav_for_section(current_section, nav1, nav2, nav3)
+                issues.append({
+                    "type": current_section, "defect_number": None,
+                    "breadcrumb": bc,         "nav_level1": n1,
+                    "nav_level2": n2,         "nav_level3": n3,
+                    "category": n1,           "subcategory": n2,
+                    "title": title,           "description": full_text,
+                })
+
+    return issues
+
+
 def parse_html(html: str) -> tuple[list[dict], str | None]:
     """
     Pure function: raw HTML → (issues, page_last_updated).
@@ -560,6 +658,24 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
     m = PAGE_LAST_UPDATED_RE.search(body.get_text(" "))
     if m:
         page_last_updated = parse_date(m.group(1))
+
+    if soup.find(class_=_FORMAT_NEW.breadcrumb):
+        fmt = _FORMAT_NEW
+    elif soup.find(class_=_FORMAT_OLD.breadcrumb):
+        fmt = _FORMAT_OLD
+    else:
+        fmt = None
+
+    if fmt is not None:
+        raw = _parse_structured_format(body, fmt)
+        seen: set = set()
+        deduped = []
+        for i in raw:
+            k = make_issue_key(i)
+            if k not in seen:
+                seen.add(k)
+                deduped.append(i)
+        return deduped, page_last_updated
 
     issues: list[dict] = []
     current_section: str | None = None
@@ -618,7 +734,8 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 bold is not None
                 and clean_text(bold.get_text()) == clean_text(text)
             )
-            is_title_prefix = bool(_TITLE_PREFIX_RE.match(text))
+            is_title_prefix  = bool(_TITLE_PREFIX_RE.match(text))
+            is_in_list       = bool(tag.find_parent(["li", "ul", "ol"]))
             looks_like_module = (
                 word_count <= word_limit and not is_title_prefix
             )
@@ -637,7 +754,7 @@ def parse_html(html: str) -> tuple[list[dict], str | None]:
                 )
             )
 
-            if not DEFECT_RE.match(text) and (
+            if not is_in_list and not DEFECT_RE.match(text) and (
                 has_sep
                 or has_color
                 or (is_heading_only and looks_like_module)

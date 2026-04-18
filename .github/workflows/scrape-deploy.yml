@@ -60,6 +60,10 @@ jobs:
       - name: Copy DB to web directory
         run: cp db/release_notes.db web/release_notes.db
 
+      - name: Inject cache-busting version into index.html
+        run: |
+          sed -i 's|"./release_notes.db"|"./release_notes.db?v=${{ github.sha }}"|' web/index.html
+
       - name: Save updated database
         uses: actions/cache/save@v4
         with:

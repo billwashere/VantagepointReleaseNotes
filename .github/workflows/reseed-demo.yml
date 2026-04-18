@@ -1,0 +1,50 @@
+name: Force Rescrape on Parser Change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scraper/scraper.py"
+      - "scraper/seed_demo.py"
+
+jobs:
+  rescrape-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests beautifulsoup4 lxml pytest
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
+      - name: Fresh scrape (no cache — parser code changed)
+        run: |
+          mkdir -p db
+          python scraper/scraper.py --resume --recheck 10 --concurrency 4
+
+      - name: Copy DB to web directory
+        run: cp db/release_notes.db web/release_notes.db
+
+      - name: Save updated database to cache
+        uses: actions/cache/save@v4
+        with:
+          path: db/release_notes.db
+          key: release-notes-db-v1-${{ github.run_id }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          publish_branch: gh-pages
+          cname: ""

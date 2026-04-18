@@ -792,6 +792,154 @@ def test_right_angle_quote_breadcrumb_in_defect_section():
     assert issues[0]["nav_level3"] == "Roles"
 
 
+def test_bold_in_list_not_breadcrumb():
+    """Short bold text inside <ol>/<ul> list items must not become a breadcrumb."""
+    html = """<html><body>
+    <span class="Deltek-NewHeading1">Enhancements</span>
+    <span class="Deltek-NewHeading2">Contract Management</span>
+    <span class="Deltek-NewNormal"><blockquote>
+    <p>Dela Contract Management Agent</p>
+    <p>Use the agent to update contract amounts from uploaded documents.</p>
+    <ol>
+      <li><p>Upload the documents in the <span style="font-weight:bold;">Document Column</span>.
+          The <span style="font-weight:bold;">Document Column</span> is user-defined.</p></li>
+      <li><p>Click <span style="font-weight:bold;">Dela Update Contract Amounts</span>.</p></li>
+    </ol>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    for issue in issues:
+        assert issue.get("nav_level1") != "Document Column", (
+            "Short bold text in <li> must not become a breadcrumb"
+        )
+        assert issue.get("nav_level1") != "Dela Update Contract Amounts", (
+            "Short bold text in <li> must not become a breadcrumb"
+        )
+
+
+def test_new_heading2_class_is_breadcrumb():
+    """<span class='Deltek-NewHeading2'> is always treated as a breadcrumb."""
+    html = """<html><body>
+    <span class="Deltek-NewHeading1">Enhancements</span>
+    <span class="Deltek-NewHeading2">Ask Dela</span>
+    <span class="Deltek-NewNormal"><blockquote>
+    <p><span style="font-weight:bold;">New Thumbs Up Feedback Icon</span></p>
+    <p>You can now give a thumbs up to Dela responses you find helpful.</p>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert any(i.get("nav_level1") == "Ask Dela" for i in issues), (
+        "Deltek-NewHeading2 span must set nav_level1"
+    )
+
+
+def test_new_heading2_long_name_is_breadcrumb():
+    """Deltek-NewHeading2 class captures module names longer than word limit."""
+    html = """<html><body>
+    <span class="Deltek-NewHeading1">Enhancements</span>
+    <span class="Deltek-NewHeading2">Batch Billing and Interactive Billing Settings</span>
+    <span class="Deltek-NewNormal"><blockquote>
+    <p><span style="font-weight:bold;">New Retention Schedule Option</span></p>
+    <p>Administrators can now configure a retention schedule for batch billing runs.</p>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert any(
+        i.get("nav_level1") == "Batch Billing and Interactive Billing Settings"
+        for i in issues
+    ), "Deltek-NewHeading2 must work for names above the heuristic word limit"
+
+
+def test_old_format_one_issue_per_body_span():
+    """Each Deltek-Body span (OLD format) produces exactly one issue."""
+    html = """<html><body>
+    <span class="Deltek-Section">Enhancements</span>
+    <span class="Deltek-AreaPath">Billing &gt;&gt; Interactive Billing</span>
+    <span class="Deltek-Body"><blockquote>
+    <p><b style="font-size:10pt;">Speed Improvements for List View</b></p>
+    <p><b style="font-size:10pt;font-weight:normal;">Performance enhancements have been made
+    to improve loading speed. Steps: upload a file, click save, confirm result.</b></p>
+    <ol>
+      <li><p>Upload a file to the record.</p></li>
+      <li><p>Click <b>Save</b>.</p></li>
+    </ol>
+    </blockquote></span>
+    <span class="Deltek-Body"><blockquote>
+    <p><b style="font-size:10pt;">Second Enhancement Here</b></p>
+    <p><b style="font-size:10pt;font-weight:normal;">Another enhancement description.</b></p>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 2, f"Expected 2 issues (one per Deltek-Body), got {len(issues)}"
+    assert issues[0]["title"] == "Speed Improvements for List View"
+    assert issues[0]["nav_level1"] == "Billing"
+    assert issues[0]["nav_level2"] == "Interactive Billing"
+    assert issues[1]["title"] == "Second Enhancement Here"
+
+
+def test_old_format_defect_parsed():
+    """Defect in Deltek-Body (OLD format) extracts defect number and nav correctly."""
+    html = """<html><body>
+    <span class="Deltek-Section">Software Issues Resolved</span>
+    <span class="Deltek-AreaPath">Billing &gt;&gt; Interactive Billing</span>
+    <span class="Deltek-Body"><blockquote>
+    <p class="body-text"><span style="font-size:10pt;font-weight:bold;">Defect 1726649:</span>
+    <span style="font-size:10pt;">When you transferred expenses on the Interactive Billing form
+    for a dormant project, no warning was shown.</span></p>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1, f"Expected 1 defect, got {len(issues)}"
+    assert issues[0]["defect_number"] == "1726649"
+    assert issues[0]["nav_level1"] == "Billing"
+    assert issues[0]["nav_level2"] == "Interactive Billing"
+
+
+def test_new_format_one_issue_per_normal_span():
+    """Each Deltek-NewNormal span produces exactly one issue (no list-item splitting)."""
+    html = """<html><body>
+    <span class="Deltek-NewHeading1">Enhancements</span>
+    <span class="Deltek-NewHeading2">Contract Management</span>
+    <span class="Deltek-NewNormal"><blockquote>
+    <p><span style="font-weight:bold;">Dela Contract Management Agent</span></p>
+    <p>Use the agent to update contract amounts from uploaded documents.</p>
+    <p>To use the agent, perform the following steps:</p>
+    <ol>
+      <li><p>Upload documents in the <span style="font-weight:bold;">Document Column</span>.</p></li>
+      <li><p>Click <span style="font-weight:bold;">Dela Update Contract Amounts</span>.</p></li>
+      <li><p>Review the extracted values and confirm.</p></li>
+    </ol>
+    </blockquote></span>
+    <span class="Deltek-NewNormal"><blockquote>
+    <p><span style="font-weight:bold;">Second Enhancement Title</span></p>
+    <p>Description of the second enhancement in this module.</p>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 2, f"Expected 2 issues (one per NewNormal), got {len(issues)}"
+    assert issues[0]["title"] == "Dela Contract Management Agent"
+    assert issues[0]["nav_level1"] == "Contract Management"
+    assert issues[1]["title"] == "Second Enhancement Title"
+    assert issues[1]["nav_level1"] == "Contract Management"
+
+
+def test_new_format_defect_parsed():
+    """Deltek-NewNormal span in a defect section parses defect number and nav correctly."""
+    html = """<html><body>
+    <span class="Deltek-NewHeading1">Software Issues Resolved</span>
+    <span class="Deltek-NewHeading2">Billing &gt;&gt; Interactive Billing</span>
+    <span class="Deltek-NewNormal"><blockquote>
+    <p><b style="font-size:10.5pt;">Defect 2532667</b><span>: When you accessed the public API,
+    some changes from version 2025.3 were not reflected.</span></p>
+    </blockquote></span>
+    </body></html>"""
+    issues, _ = parse_html(html)
+    assert len(issues) == 1, f"Expected 1 defect, got {len(issues)}"
+    assert issues[0]["defect_number"] == "2532667"
+    assert issues[0]["nav_level1"] == "Billing"
+    assert issues[0]["nav_level2"] == "Interactive Billing"
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -855,6 +1003,14 @@ if __name__ == "__main__":
         test_colored_breadcrumb_parsed_by_parser,
         test_word_fragments_not_breadcrumbs,
         test_right_angle_quote_breadcrumb_in_defect_section,
+        # List items and structured CSS-class formats (OLD and NEW)
+        test_bold_in_list_not_breadcrumb,
+        test_new_heading2_class_is_breadcrumb,
+        test_new_heading2_long_name_is_breadcrumb,
+        test_old_format_one_issue_per_body_span,
+        test_old_format_defect_parsed,
+        test_new_format_one_issue_per_normal_span,
+        test_new_format_defect_parsed,
     ]
     passed = failed = 0
     for t in tests:

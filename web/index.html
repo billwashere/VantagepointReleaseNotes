@@ -268,6 +268,8 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
 /* Changelog mobile */
 @media(max-width:700px){
   #cl-drawer{width:100%}
+  .cl-key-list{overflow-wrap:break-word;word-break:break-all}
+  .cl-date{overflow-wrap:break-word}
 }
 
 /* Changelog button label — hide on very small screens */
@@ -275,6 +277,11 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
   #changelog-btn span.cl-label{display:none}
 }
 
+
+#footer{padding:10px 18px;font-family:var(--mono);font-size:.68rem;color:var(--dim);
+  border-top:1px solid var(--bdr);flex-shrink:0}
+#footer a{color:var(--dim);text-decoration:underline}
+#footer a:hover{color:var(--txt)}
 
 .amended-dot{display:inline-block;width:6px;height:6px;border-radius:50%;
   background:var(--por);margin-left:5px;vertical-align:middle;flex-shrink:0;
@@ -289,17 +296,20 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
 @media (max-width: 700px) {
   #sidebar { display: none }
   #sidebar.mob-open {
-    display:flex;position:fixed;top:0;left:0;bottom:0;z-index:50;
+    display:flex;flex-direction:column;
+    position:fixed;top:0;left:0;bottom:0;z-index:50;
     width:min(280px,90vw);box-shadow:4px 0 24px rgba(0,0,0,.5)
   }
   #mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49}
-  #sidebar.mob-open ~ #mob-overlay{display:block}
   #mob-menu{display:flex;align-items:center;justify-content:center;
     width:34px;height:34px;border-radius:var(--r);color:var(--med);
     border:1px solid var(--bdr2);flex-shrink:0}
   #mob-menu:hover{color:var(--txt);border-color:var(--txt)}
   /* Collapse statsbar on small screens */
   #statsbar{display:none}
+  /* Compact topbar: icon-only logo, hide decorative dividers */
+  .logo{font-size:0}
+  #topbar .vdiv{display:none}
   /* Simplify table columns: hide App Area and Date on tiny screens */
   th:nth-child(3),td:nth-child(3),
   th:nth-child(6),td:nth-child(6){display:none}
@@ -423,6 +433,7 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
       </div>
     </div>
   </div>
+  <div id="footer">Data scraped from <a href="https://help.deltek.com/product/Vantagepoint/ReleaseNotes/" target="_blank" rel="noopener">Deltek Vantagepoint release notes</a></div>
 </div>
 
 <script>
@@ -1146,7 +1157,10 @@ document.addEventListener("keydown", e => {
 
 // ── MOBILE SIDEBAR ────────────────────────────────────────────────
 function toggleSidebar() {
-  document.getElementById("sidebar").classList.toggle("mob-open");
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("mob-overlay");
+  const open = sidebar.classList.toggle("mob-open");
+  overlay.style.display = open ? "block" : "";
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────
