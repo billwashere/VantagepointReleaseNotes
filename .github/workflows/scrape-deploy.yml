@@ -40,35 +40,45 @@ jobs:
 
       - run: pip install requests beautifulsoup4 lxml
 
-      - name: Restore cached database
+      - name: Restore cached databases
         uses: actions/cache@v4
         id: db-cache
         with:
-          path: db/release_notes.db
+          path: |
+            db/release_notes.db
+            db/workbook_release_notes.db
           # Week-scoped key: persists across scraper code changes within a week.
           # Changing the key prefix (e.g. v2→v3) forces a full re-scrape when needed.
-          key: release-notes-db-v1-${{ github.run_id }}
+          key: release-notes-db-v2-${{ github.run_id }}
           restore-keys: |
-            release-notes-db-v1-
+            release-notes-db-v2-
 
-      - name: Run scraper
+      - name: Run Vantagepoint scraper
         # --resume  : skip already-scraped old releases
         # --recheck 10 : always re-fetch last 10 releases to detect retroactive amendments
         # --concurrency 4 : parallel fetches (polite — 0.5s delay per worker)
         run: python scraper/scraper.py --resume --recheck 10 --concurrency 4
 
-      - name: Copy DB to web directory
-        run: cp db/release_notes.db web/release_notes.db
+      - name: Run WorkBook scraper
+        run: python scraper/workbook_scraper.py --resume --recheck 10 --concurrency 4
 
-      - name: Inject cache-busting version into index.html
+      - name: Copy DBs to web directory
+        run: |
+          cp db/release_notes.db web/release_notes.db
+          cp db/workbook_release_notes.db web/workbook_release_notes.db
+
+      - name: Inject cache-busting version into HTML files
         run: |
           sed -i 's|"./release_notes.db"|"./release_notes.db?v=${{ github.sha }}"|' web/index.html
+          sed -i 's|"../workbook_release_notes.db"|"../workbook_release_notes.db?v=${{ github.sha }}"|' web/workbook/index.html
 
-      - name: Save updated database
+      - name: Save updated databases
         uses: actions/cache/save@v4
         with:
-          path: db/release_notes.db
-          key: release-notes-db-v1-${{ github.run_id }}
+          path: |
+            db/release_notes.db
+            db/workbook_release_notes.db
+          key: release-notes-db-v2-${{ github.run_id }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

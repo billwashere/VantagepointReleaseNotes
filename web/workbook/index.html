@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Deltek Vantagepoint — Release Notes Explorer</title>
+<title>Deltek WorkBook — Release Notes Explorer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
   --bg:#0b0e14;--bg2:#111520;--bg3:#181d2b;
   --bdr:#1e2436;--bdr2:#252d42;
   --txt:#c8d0e8;--dim:#5a6480;--med:#8b96b8;
-  --acc:#3d9eff;--acc-dim:#1a4a80;
+  --acc:#a78bfa;--acc-dim:#3d2d6b;
   --def:#ff5050;--def-bg:rgba(255,80,80,.08);
   --enh:#38d986;--enh-bg:rgba(56,217,134,.08);
   --reg:#ffbe00;--reg-bg:rgba(255,190,0,.08);
@@ -337,7 +337,7 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
 <div id="boot">
   <div class="boot-logo">
     <div class="boot-sq"><i></i><i></i><i></i><i></i></div>
-    Vantagepoint <span>Release Notes</span>
+    WorkBook <span>Release Notes</span>
   </div>
   <div class="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
   <div class="boot-stage" id="boot-stage">Connecting…</div>
@@ -349,7 +349,7 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
   <div id="topbar">
     <div class="logo">
       <div class="logo-sq"><i></i><i></i><i></i><i></i></div>
-      Vantagepoint <span>Release Notes</span>
+      WorkBook <span>Release Notes</span>
     </div>
     <button id="mob-menu" aria-label="Toggle filters" onclick="toggleSidebar()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -437,13 +437,13 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
       </div>
     </div>
   </div>
-  <div id="footer">Data scraped from <a href="https://help.deltek.com/product/Vantagepoint/ReleaseNotes/" target="_blank" rel="noopener">Deltek Vantagepoint release notes</a></div>
+  <div id="footer">Data scraped from <a href="https://help.deltek.com/product/workbook/releasenotes/ReleaseNotes.html" target="_blank" rel="noopener">Deltek WorkBook release notes</a></div>
 </div>
 
 <script>
 "use strict";
 // ── CONFIG ────────────────────────────────────────────────────────────────
-const DB_URL      = "./release_notes.db";
+const DB_URL      = "../workbook_release_notes.db";
 const SQLJS_JS    = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js";
 const SQLJS_WASM  = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm";
 const PAGE_SIZE   = 250;   // rows per page
