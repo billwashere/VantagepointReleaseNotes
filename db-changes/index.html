@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deltek Vantagepoint — Database Changes Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0b0e14;--bg2:#111520;--bg3:#181d2b;
+  --bdr:#1e2436;--bdr2:#252d42;
+  --txt:#c8d0e8;--dim:#5a6480;--med:#8b96b8;
+  --acc:#3d9eff;--acc-dim:#1a4a80;
+  --new:#38d986;--new-bg:rgba(56,217,134,.08);
+  --rem:#ff5050;--rem-bg:rgba(255,80,80,.08);
+  --mod:#ffbe00;--mod-bg:rgba(255,190,0,.08);
+  --ren:#a78bfa;--ren-bg:rgba(167,139,250,.1);
+  --obj:#60a5fa;--obj-bg:rgba(96,165,250,.08);
+  --mono:"IBM Plex Mono",monospace;
+  --sans:"Syne",sans-serif;
+  --r:6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input{font-family:var(--mono)}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
+
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* TOP BAR */
+#topbar{display:flex;align-items:center;gap:14px;padding:0 18px;height:52px;
+  background:var(--bg2);border-bottom:1px solid var(--bdr);flex-shrink:0;z-index:20}
+.logo{font-weight:800;font-size:1rem;letter-spacing:-.01em;color:#fff;display:flex;align-items:center;gap:9px;white-space:nowrap}
+.logo span{color:var(--acc)}
+.logo-sq{display:grid;grid-template-columns:1fr 1fr;gap:2.5px;width:19px;height:19px}
+.logo-sq i{border-radius:2px;background:var(--acc)}
+.logo-sq i:nth-child(2){opacity:.5}
+.logo-sq i:nth-child(3){opacity:.5}
+.logo-sq i:nth-child(4){opacity:.2}
+.vdiv{width:1px;height:22px;background:var(--bdr2)}
+#search-wrap{flex:1;max-width:420px;position:relative}
+#search{width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--r);
+  color:var(--txt);padding:6px 10px 6px 33px;font-size:.82rem;outline:none;transition:border-color .15s}
+#search:focus{border-color:var(--acc)}
+#search::placeholder{color:var(--dim)}
+.sico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--dim);pointer-events:none}
+#statsbar{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--dim);white-space:nowrap}
+#statsbar b{color:var(--med)}
+.back-link{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--r);
+  border:1px solid var(--bdr2);color:var(--med);font-family:var(--mono);font-size:.72rem;
+  background:var(--bg2);transition:all .12s;flex-shrink:0;text-decoration:none}
+.back-link:hover{border-color:var(--acc);color:var(--acc);text-decoration:none}
+
+/* BODY */
+#body{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+#sidebar{width:240px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--bdr);
+  overflow-y:auto;padding:10px 0}
+.sb-label{padding:8px 14px 5px;font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim)}
+.cs-btn{display:flex;align-items:center;width:100%;padding:5px 12px;
+  border-radius:0;font-size:.78rem;color:var(--med);background:none;border:none;
+  font-family:var(--mono);cursor:pointer;transition:background .1s,color .1s;
+  border-left:2px solid transparent;text-align:left;gap:6px}
+.cs-btn:hover{background:var(--bg3);color:var(--txt)}
+.cs-btn.sel{background:var(--bg3);border-left-color:var(--acc);color:var(--acc)}
+.cs-arrow{font-size:.7rem;color:var(--dim);flex-shrink:0}
+.cs-versions{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cs-cnt{font-size:.65rem;color:var(--dim);flex-shrink:0;margin-left:auto}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOOLBAR / CHIPS */
+#toolbar{display:flex;align-items:center;gap:8px;padding:9px 14px;
+  border-bottom:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap;min-height:44px}
+.chips{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;
+  font-family:var(--mono);font-size:.68rem;cursor:pointer;border:1px solid var(--bdr2);
+  color:var(--dim);background:var(--bg2);transition:all .12s}
+.chip:hover{border-color:var(--med);color:var(--txt)}
+.chip.act{border-color:var(--acc);color:var(--acc);background:rgba(61,158,255,.08)}
+.chip .cdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+#rcnt{font-family:var(--mono);font-size:.68rem;color:var(--dim);white-space:nowrap}
+
+/* TABLE */
+#tbl-wrap{flex:1;overflow-y:auto;position:relative}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead{position:sticky;top:0;z-index:5}
+thead tr{background:var(--bg2);border-bottom:1px solid var(--bdr)}
+th{padding:9px 11px;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;white-space:nowrap}
+th:nth-child(1){width:130px}
+th:nth-child(2){width:130px}
+th:nth-child(3){width:auto}
+th:nth-child(4){width:auto}
+th:nth-child(5){width:130px}
+tbody tr{border-bottom:1px solid var(--bdr);transition:background .08s}
+td{padding:8px 11px;font-size:.78rem;vertical-align:top;font-family:var(--mono);line-height:1.4}
+
+.ct-badge{display:inline-flex;padding:2px 7px;border-radius:3px;
+  font-family:var(--mono);font-size:.67rem;font-weight:500;white-space:nowrap}
+.ct-badge.new_table,.ct-badge.new_column,.ct-badge.new_object{background:var(--new-bg);color:var(--new)}
+.ct-badge.removed_table,.ct-badge.removed_column,.ct-badge.removed_object{background:var(--rem-bg);color:var(--rem)}
+.ct-badge.modified_column{background:var(--mod-bg);color:var(--mod)}
+.ct-badge.renamed_table,.ct-badge.renamed_column{background:var(--ren-bg);color:var(--ren)}
+
+.dt-cell{color:var(--dim)}
+.dt-arrow{color:var(--mod);margin:0 4px}
+.obj-type{display:inline-block;padding:1px 5px;border-radius:3px;
+  background:var(--obj-bg);color:var(--obj);font-size:.65rem}
+
+/* Pagination */
+#pagination{display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:10px 14px;border-top:1px solid var(--bdr);flex-shrink:0;
+  font-family:var(--mono);font-size:.72rem;color:var(--dim);background:var(--bg)}
+#pagination button{padding:4px 12px;border-radius:var(--r);border:1px solid var(--bdr2);
+  color:var(--med);background:var(--bg2);font-family:var(--mono);font-size:.72rem;
+  cursor:pointer;transition:all .1s}
+#pagination button:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
+#pagination button:disabled{opacity:.35;cursor:default}
+#page-info{min-width:120px;text-align:center}
+
+/* Loading overlay */
+#boot{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;z-index:100}
+.boot-logo{font-family:var(--sans);font-weight:800;font-size:1.3rem;color:#fff;
+  display:flex;align-items:center;gap:10px}
+.boot-logo span{color:var(--acc)}
+.boot-sq{display:grid;grid-template-columns:1fr 1fr;gap:3px;width:24px;height:24px}
+.boot-sq i{border-radius:2px;background:var(--acc)}
+.boot-sq i:nth-child(2){opacity:.5}.boot-sq i:nth-child(3){opacity:.5}.boot-sq i:nth-child(4){opacity:.2}
+.boot-stage{font-family:var(--mono);font-size:.78rem;color:var(--dim);min-height:1.2em}
+.boot-bar-wrap{width:320px;height:4px;background:var(--bdr2);border-radius:2px;overflow:hidden}
+.boot-bar{height:100%;width:0%;background:var(--acc);border-radius:2px;transition:width .1s linear}
+.boot-bytes{font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+
+#empty{display:none;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:8px;color:var(--dim);font-family:var(--mono);font-size:.8rem;text-align:center;padding:40px}
+mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:0 1px}
+
+#footer{padding:10px 18px;font-family:var(--mono);font-size:.68rem;color:var(--dim);
+  border-top:1px solid var(--bdr);flex-shrink:0}
+#footer a{color:var(--dim);text-decoration:underline}
+#footer a:hover{color:var(--txt)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:700px){#sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div class="boot-logo">
+    <div class="boot-sq"><i></i><i></i><i></i><i></i></div>
+    Vantagepoint <span>DB Changes</span>
+  </div>
+  <div class="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
+  <div class="boot-stage" id="boot-stage">Connecting…</div>
+  <div class="boot-bytes" id="boot-bytes"></div>
+</div>
+
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div class="logo">
+      <div class="logo-sq"><i></i><i></i><i></i><i></i></div>
+      Vantagepoint <span>DB Changes</span>
+    </div>
+    <div class="vdiv"></div>
+    <div id="search-wrap">
+      <svg class="sico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" type="text" placeholder="Search table or column name…" autocomplete="off">
+    </div>
+    <div id="statsbar">Loading…</div>
+    <div class="vdiv"></div>
+    <a href="../" class="back-link">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Release Notes
+    </a>
+  </div>
+
+  <div id="body">
+    <nav id="sidebar">
+      <div class="sb-label">Version Upgrade</div>
+      <div id="cs-list"></div>
+    </nav>
+
+    <div id="main">
+      <div id="toolbar">
+        <div class="chips" id="chips"></div>
+        <div id="rcnt">—</div>
+      </div>
+      <div id="tbl-wrap">
+        <div id="empty">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          No changes match your filters.
+        </div>
+        <table id="tbl" style="display:none">
+          <thead><tr>
+            <th>Change</th>
+            <th>Table Name</th>
+            <th>Column / Object Name</th>
+            <th>Data Type</th>
+            <th>Version</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination" style="display:none">
+        <button id="pg-first" title="First page">«</button>
+        <button id="pg-prev"  title="Previous">‹</button>
+        <span id="page-info"></span>
+        <button id="pg-next"  title="Next">›</button>
+        <button id="pg-last"  title="Last page">»</button>
+      </div>
+    </div>
+  </div>
+  <div id="footer">
+    Data scraped from <a href="https://help.deltek.com/product/Vantagepoint/ReleaseNotes/" target="_blank" rel="noopener">Deltek Vantagepoint release notes</a>
+    &nbsp;·&nbsp;
+    <a href="../">Release Notes Explorer</a>
+  </div>
+</div>
+
+<script>
+"use strict";
+const DB_URL     = "../release_notes.db?v=19dcbe7640dcfb0e00dc5489c2f2e7b5dd8fc876";
+const SQLJS_JS   = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js";
+const SQLJS_WASM = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm";
+const PAGE_SIZE  = 300;
+const DEBOUNCE   = 220;
+
+// ── WEB WORKER ───────────────────────────────────────────────────────────────
+const WORKER_SRC = [
+  '"use strict";',
+  'importScripts("' + SQLJS_JS + '");',
+  'let db = null;',
+  'self.onmessage = async function(e) {',
+  '  const { id, type, payload } = e.data;',
+  '  try {',
+  '    if (type === "init") {',
+  '      const SQL = await initSqlJs({ locateFile: () => "' + SQLJS_WASM + '" });',
+  '      db = new SQL.Database(new Uint8Array(payload));',
+  '      self.postMessage({ id, ok: true });',
+  '    } else if (type === "exec") {',
+  '      const { sql, params = [] } = payload;',
+  '      const stmt = db.prepare(sql);',
+  '      stmt.bind(params);',
+  '      const rows = [];',
+  '      while (stmt.step()) rows.push(stmt.getAsObject());',
+  '      stmt.free();',
+  '      self.postMessage({ id, ok: true, rows });',
+  '    }',
+  '  } catch(err) {',
+  '    self.postMessage({ id, ok: false, error: err.message });',
+  '  }',
+  '};',
+].join('\n');
+
+const workerBlob = new Blob([WORKER_SRC], { type: 'text/javascript' });
+const worker = new Worker(URL.createObjectURL(workerBlob));
+let _msgId = 0;
+const _pending = new Map();
+worker.onmessage = ({ data }) => {
+  const p = _pending.get(data.id);
+  if (!p) return;
+  _pending.delete(data.id);
+  data.ok ? p.resolve(data) : p.reject(new Error(data.error));
+};
+function workerSend(type, payload, transfer = []) {
+  return new Promise((resolve, reject) => {
+    const id = ++_msgId;
+    _pending.set(id, { resolve, reject });
+    worker.postMessage({ id, type, payload }, transfer);
+  });
+}
+function Q(sql, params = []) {
+  return workerSend("exec", { sql, params }).then(d => d.rows);
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let allChangeSets = [];          // [{id, from_version, to_version, item_count}]
+let selectedSetId = null;        // null = all versions
+let activeTypes = new Set();     // empty = all
+let searchQ = "";
+let searchTimer = null;
+let page = 0;
+let totalRows = [];
+
+const CHANGE_TYPES = [
+  { type: "new_table",      label: "New Table",      group: "table" },
+  { type: "removed_table",  label: "Removed Table",  group: "table" },
+  { type: "renamed_table",  label: "Renamed Table",  group: "table" },
+  { type: "new_column",     label: "New Column",     group: "column" },
+  { type: "modified_column",label: "Modified Column",group: "column" },
+  { type: "removed_column", label: "Removed Column", group: "column" },
+  { type: "renamed_column", label: "Renamed Column", group: "column" },
+  { type: "new_object",     label: "New Object",     group: "object" },
+  { type: "removed_object", label: "Removed Object", group: "object" },
+];
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+function setStage(msg) { document.getElementById("boot-stage").textContent = msg; }
+function setProgress(pct) { document.getElementById("boot-bar").style.width = (pct * 100).toFixed(1) + "%"; }
+function setBytes(recv, total) {
+  const fmt = n => n >= 1048576 ? (n/1048576).toFixed(1)+" MB"
+                 : n >= 1024    ? (n/1024).toFixed(0)+" KB"
+                 : n+" B";
+  document.getElementById("boot-bytes").textContent =
+    total ? fmt(recv)+" / "+fmt(total) : fmt(recv);
+}
+
+async function downloadDB() {
+  setStage("Connecting to database…");
+  const resp = await fetch(DB_URL);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const contentLength = parseInt(resp.headers.get("Content-Length") || "0", 10);
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let received = 0;
+  setStage("Downloading database…");
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    setBytes(received, contentLength);
+    setProgress(contentLength ? received / contentLength : 0.5);
+  }
+  const buf = new Uint8Array(received);
+  let off = 0;
+  for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return buf.buffer;
+}
+
+async function init() {
+  try {
+    const buffer = await downloadDB();
+    setStage("Initialising SQL engine…");
+    setProgress(0.95);
+    await workerSend("init", buffer, [buffer]);
+    setStage("Loading change sets…");
+    setProgress(1);
+    await buildSidebar();
+    buildChips();
+    await runQuery();
+    document.getElementById("boot").style.display = "none";
+    document.getElementById("app").style.display = "";
+  } catch(e) {
+    setStage("Error: " + e.message);
+    document.getElementById("boot-bar").style.background = "var(--rem)";
+    console.error(e);
+  }
+}
+
+// ── SIDEBAR ───────────────────────────────────────────────────────────────────
+async function buildSidebar() {
+  const rows = await Q(`
+    SELECT cs.id, cs.from_version, cs.to_version,
+           COUNT(ci.id) AS item_count
+    FROM db_change_sets cs
+    LEFT JOIN db_change_items ci ON ci.change_set_id = cs.id
+    GROUP BY cs.id
+    ORDER BY cs.id DESC
+  `);
+  allChangeSets = rows;
+
+  const totalItems = rows.reduce((s, r) => s + (r.item_count || 0), 0);
+  const totalSets = rows.length;
+  document.getElementById("statsbar").innerHTML =
+    `<b>${totalSets}</b> upgrades &nbsp;·&nbsp; <b>${totalItems.toLocaleString()}</b> changes`;
+
+  const list = document.getElementById("cs-list");
+  list.innerHTML = "";
+
+  // "All" entry
+  const allBtn = document.createElement("button");
+  allBtn.className = "cs-btn sel";
+  allBtn.dataset.id = "";
+  allBtn.innerHTML = `<span class="cs-versions">All upgrades</span>
+    <span class="cs-cnt">${totalItems.toLocaleString()}</span>`;
+  allBtn.onclick = () => selectSet(null);
+  list.appendChild(allBtn);
+
+  for (const r of rows) {
+    const btn = document.createElement("button");
+    btn.className = "cs-btn";
+    btn.dataset.id = r.id;
+    btn.innerHTML = `
+      <svg class="cs-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+      <span class="cs-versions">${esc(r.from_version)} → ${esc(r.to_version)}</span>
+      <span class="cs-cnt">${r.item_count || 0}</span>`;
+    btn.onclick = () => selectSet(r.id);
+    list.appendChild(btn);
+  }
+}
+
+function selectSet(id) {
+  selectedSetId = id;
+  document.querySelectorAll(".cs-btn").forEach(b => {
+    b.classList.toggle("sel", String(b.dataset.id) === String(id ?? ""));
+  });
+  page = 0;
+  runQuery();
+}
+
+// ── CHIPS ─────────────────────────────────────────────────────────────────────
+function buildChips() {
+  const wrap = document.getElementById("chips");
+  wrap.innerHTML = "";
+  for (const ct of CHANGE_TYPES) {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.dataset.type = ct.type;
+    const dotColor = {
+      table: "var(--obj)", column: "var(--acc)", object: "var(--ren)"
+    }[ct.group] || "var(--med)";
+    chip.innerHTML = `<span class="cdot" style="background:${dotColor}"></span>${ct.label}`;
+    chip.onclick = () => toggleType(ct.type);
+    wrap.appendChild(chip);
+  }
+}
+
+function toggleType(type) {
+  if (activeTypes.has(type)) {
+    activeTypes.delete(type);
+  } else {
+    activeTypes.add(type);
+  }
+  document.querySelectorAll(".chip").forEach(c => {
+    c.classList.toggle("act", activeTypes.has(c.dataset.type));
+  });
+  page = 0;
+  runQuery();
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+document.getElementById("search").addEventListener("input", e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQ = e.target.value.trim();
+    page = 0;
+    runQuery();
+  }, DEBOUNCE);
+});
+
+// ── QUERY ─────────────────────────────────────────────────────────────────────
+async function runQuery() {
+  const params = [];
+  const conds = [];
+
+  if (selectedSetId !== null) {
+    conds.push("ci.change_set_id = ?");
+    params.push(selectedSetId);
+  }
+  if (activeTypes.size > 0) {
+    conds.push(`ci.change_type IN (${[...activeTypes].map(() => "?").join(",")})`);
+    params.push(...activeTypes);
+  }
+  if (searchQ) {
+    const like = "%" + searchQ.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+    conds.push("(ci.table_name LIKE ? ESCAPE '\\' OR ci.column_name LIKE ? ESCAPE '\\' OR ci.object_name LIKE ? ESCAPE '\\')");
+    params.push(like, like, like);
+  }
+
+  const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+
+  const rows = await Q(`
+    SELECT ci.change_type, ci.table_name, ci.column_name, ci.data_type,
+           ci.old_data_type, ci.new_data_type, ci.object_name, ci.object_type,
+           cs.from_version, cs.to_version
+    FROM db_change_items ci
+    JOIN db_change_sets cs ON cs.id = ci.change_set_id
+    ${where}
+    ORDER BY cs.id DESC, ci.change_type, ci.table_name, ci.column_name, ci.object_name
+  `, params);
+
+  totalRows = rows;
+  renderTable();
+  renderPagination();
+  document.getElementById("rcnt").textContent =
+    rows.length.toLocaleString() + " change" + (rows.length !== 1 ? "s" : "");
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+const CT_LABELS = {
+  new_table: "New Table", removed_table: "Removed Table", renamed_table: "Renamed Table",
+  new_column: "New Column", modified_column: "Modified Column",
+  removed_column: "Removed Column", renamed_column: "Renamed Column",
+  new_object: "New Object", removed_object: "Removed Object",
+};
+
+function renderTable() {
+  const tbody = document.getElementById("tbody");
+  const tbl = document.getElementById("tbl");
+  const empty = document.getElementById("empty");
+  const slice = totalRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  if (!slice.length) {
+    tbl.style.display = "none";
+    empty.style.display = "flex";
+    return;
+  }
+  empty.style.display = "none";
+  tbl.style.display = "";
+
+  const q = searchQ.toLowerCase();
+  function hi(s) {
+    if (!s || !q) return esc(s || "");
+    const idx = s.toLowerCase().indexOf(q);
+    if (idx < 0) return esc(s);
+    return esc(s.slice(0, idx)) + "<mark>" + esc(s.slice(idx, idx + q.length)) + "</mark>" + esc(s.slice(idx + q.length));
+  }
+
+  tbody.innerHTML = slice.map(r => {
+    const ct = r.change_type || "";
+    const label = CT_LABELS[ct] || ct;
+
+    // Column/Object name cell
+    let nameCell = "";
+    if (r.object_name) {
+      nameCell = hi(r.object_name);
+      if (r.object_type) nameCell += ` <span class="obj-type">${esc(r.object_type)}</span>`;
+    } else if (r.column_name) {
+      nameCell = hi(r.column_name);
+    }
+
+    // Data type cell
+    let dtCell = "";
+    if (r.old_data_type || r.new_data_type) {
+      dtCell = `<span class="dt-cell">${esc(r.old_data_type || "—")}</span>`
+             + `<span class="dt-arrow">→</span>`
+             + `<span class="dt-cell">${esc(r.new_data_type || "—")}</span>`;
+    } else if (r.data_type) {
+      dtCell = `<span class="dt-cell">${esc(r.data_type)}</span>`;
+    }
+
+    const version = `${esc(r.from_version)} → ${esc(r.to_version)}`;
+
+    return `<tr>
+      <td><span class="ct-badge ${esc(ct)}">${esc(label)}</span></td>
+      <td>${hi(r.table_name)}</td>
+      <td>${nameCell}</td>
+      <td>${dtCell}</td>
+      <td style="color:var(--dim);font-size:.7rem">${version}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderPagination() {
+  const total = totalRows.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const pg = document.getElementById("pagination");
+  if (pages <= 1) { pg.style.display = "none"; return; }
+  pg.style.display = "flex";
+  const from = page * PAGE_SIZE + 1;
+  const to = Math.min((page + 1) * PAGE_SIZE, total);
+  document.getElementById("page-info").textContent =
+    `${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}`;
+  document.getElementById("pg-first").disabled = page === 0;
+  document.getElementById("pg-prev").disabled  = page === 0;
+  document.getElementById("pg-next").disabled  = page >= pages - 1;
+  document.getElementById("pg-last").disabled  = page >= pages - 1;
+}
+
+document.getElementById("pg-first").onclick = () => { page = 0; renderTable(); renderPagination(); scrollTop(); };
+document.getElementById("pg-prev").onclick  = () => { page--; renderTable(); renderPagination(); scrollTop(); };
+document.getElementById("pg-next").onclick  = () => { page++; renderTable(); renderPagination(); scrollTop(); };
+document.getElementById("pg-last").onclick  = () => {
+  page = Math.ceil(totalRows.length / PAGE_SIZE) - 1;
+  renderTable(); renderPagination(); scrollTop();
+};
+function scrollTop() { document.getElementById("tbl-wrap").scrollTop = 0; }
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+init();
+</script>
+</body>
+</html>
