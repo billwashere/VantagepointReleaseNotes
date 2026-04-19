@@ -290,7 +290,7 @@ def run(
     conn = _base.get_db(DB_PATH)
     log.info("DB: %s%s", DB_PATH, "  [DRY-RUN]" if dry_run else "")
 
-    # Discover all version index URLs
+    # Discover all version index URLs, then construct DB-change URLs from them
     all_index_urls = discover_index_urls()
     if versions_filter:
         all_index_urls = [
@@ -298,19 +298,18 @@ def run(
             if any(f"/{v}/" in u for v in versions_filter)
         ]
 
-    # Collect all DB-change page descriptors across all versions
     all_cs: list[dict] = []
     for idx_url in all_index_urls:
         found = discover_db_change_urls(idx_url)
         all_cs.extend(found)
-        log.info("Index %-8s → %d DB-change pages", idx_url.split("/")[-3], len(found))
+        log.info("Index %-10s → %d DB-change pages", idx_url.rstrip("/").split("/")[-2], len(found))
 
     if not all_cs:
         log.warning("No database change pages found.")
         conn.close()
         return 0
 
-    # Deduplicate by URL
+    # Deduplicate by URL (shouldn't be needed but defensive)
     seen_urls: set[str] = set()
     unique_cs = []
     for cs in all_cs:

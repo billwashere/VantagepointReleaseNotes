@@ -36,6 +36,7 @@ def test_digits_to_version_old():
     assert _digits_to_version("71") == "7.1"
 
 
+
 def test_extract_versions_from_url_modern():
     url = "https://help.deltek.com/product/Vantagepoint/2026.2/ReleaseNotes/DVP20261toDVP20262DatabaseChanges.htm"
     result = _extract_versions_from_url(url)
