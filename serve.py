@@ -86,6 +86,7 @@ class RangeHTTPRequestHandler(SimpleHTTPRequestHandler):
         # Always advertise range support and CORS
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
     def log_message(self, fmt, *args):

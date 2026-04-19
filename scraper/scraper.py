@@ -284,6 +284,31 @@ CREATE TRIGGER IF NOT EXISTS issues_ai AFTER INSERT ON issues BEGIN
     VALUES (new.id, new.title, new.description, new.breadcrumb,
             new.nav_level1, new.nav_level2, new.nav_level3);
 END;
+
+CREATE TABLE IF NOT EXISTS db_change_sets (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_version TEXT NOT NULL,
+    to_version   TEXT NOT NULL,
+    url          TEXT NOT NULL UNIQUE,
+    scraped_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS db_change_items (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    change_set_id INTEGER NOT NULL REFERENCES db_change_sets(id),
+    change_type   TEXT NOT NULL,
+    table_name    TEXT,
+    column_name   TEXT,
+    data_type     TEXT,
+    old_data_type TEXT,
+    new_data_type TEXT,
+    object_name   TEXT,
+    object_type   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_dci_set   ON db_change_items(change_set_id);
+CREATE INDEX IF NOT EXISTS idx_dci_table ON db_change_items(table_name);
+CREATE INDEX IF NOT EXISTS idx_dci_type  ON db_change_items(change_type);
 """
 
 

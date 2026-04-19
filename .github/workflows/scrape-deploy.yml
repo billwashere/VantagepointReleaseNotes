@@ -62,6 +62,9 @@ jobs:
       - name: Run WorkBook scraper
         run: python scraper/workbook_scraper.py --resume --recheck 10 --concurrency 4
 
+      - name: Run DB changes scraper
+        run: python scraper/db_changes_scraper.py --resume --recheck 10 --concurrency 4
+
       - name: Copy DBs to web directory
         run: |
           cp db/release_notes.db web/release_notes.db
@@ -71,6 +74,7 @@ jobs:
         run: |
           sed -i 's|"./release_notes.db"|"./release_notes.db?v=${{ github.sha }}"|' web/index.html
           sed -i 's|"../workbook_release_notes.db"|"../workbook_release_notes.db?v=${{ github.sha }}"|' web/workbook/index.html
+          sed -i 's|"../release_notes.db"|"../release_notes.db?v=${{ github.sha }}"|' web/db-changes/index.html
 
       - name: Save updated databases
         uses: actions/cache/save@v4
