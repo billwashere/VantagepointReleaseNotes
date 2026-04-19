@@ -443,7 +443,7 @@ mark{background:rgba(61,158,255,.22);color:var(--acc);border-radius:2px;padding:
 <script>
 "use strict";
 // ── CONFIG ────────────────────────────────────────────────────────────────
-const DB_URL      = "./release_notes.db?v=e589b0ec2c63982cf8c1268dbdb25e189eda7aab";
+const DB_URL      = "./release_notes.db?v=d22a7e7b6130603ce8fb46efb5b7affbdf48e621";
 const SQLJS_JS    = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js";
 const SQLJS_WASM  = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.wasm";
 const PAGE_SIZE   = 250;   // rows per page
@@ -614,7 +614,7 @@ async function buildBcTree() {
 
   let sql, sqlParams = [];
   if (filterType === 'ported') {
-    sql = `SELECT DISTINCT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(*) n
+    sql = `SELECT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(DISTINCT i.id) n
            FROM issues i ${verJoin} WHERE i.nav_level1 != ''
              AND i.defect_number IS NOT NULL
              AND (SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1
@@ -623,14 +623,14 @@ async function buildBcTree() {
            ORDER BY i.nav_level1, i.nav_level2, i.nav_level3`;
     sqlParams = verVals;
   } else if (filterType !== 'all') {
-    sql = `SELECT DISTINCT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(*) n
+    sql = `SELECT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(DISTINCT i.id) n
            FROM issues i ${verJoin} WHERE i.nav_level1 != '' AND i.type=?
            ${verCond}
            GROUP BY i.nav_level1, i.nav_level2, i.nav_level3
            ORDER BY i.nav_level1, i.nav_level2, i.nav_level3`;
     sqlParams = [filterType, ...verVals];
   } else {
-    sql = `SELECT DISTINCT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(*) n
+    sql = `SELECT i.nav_level1, i.nav_level2, i.nav_level3, COUNT(DISTINCT i.id) n
            FROM issues i ${verJoin} WHERE i.nav_level1 != ''
            ${verCond}
            GROUP BY i.nav_level1, i.nav_level2, i.nav_level3
@@ -761,7 +761,7 @@ async function buildVersionTree() {
         if (filterVersions.has(p.patch_version)) filterVersions.delete(p.patch_version);
         else filterVersions.add(p.patch_version);
         refreshVersionHighlight();
-        buildBcTree(); triggerQuery();
+        buildBcTree(); updateCounts(); triggerQuery();
       };
       pList.appendChild(pb);
     }
@@ -784,14 +784,38 @@ function refreshVersionHighlight() {
 
 // ── COUNTS ────────────────────────────────────────────────────────────────
 async function updateCounts() {
-  const rows = await Q(`SELECT type, COUNT(DISTINCT id) n FROM issues GROUP BY type`);
+  const hasVer  = filterVersions.size > 0;
+  const verVals = hasVer ? [...filterVersions] : [];
+  const verPh   = verVals.map(() => '?').join(',');
+  const verJoin = hasVer ? `JOIN issue_versions iv  ON iv.issue_id=i.id JOIN releases r ON r.id=iv.release_id` : '';
+  const verCond = hasVer ? `AND r.patch_version IN (${verPh})` : '';
+
+  const rows = await Q(
+    `SELECT i.type, COUNT(DISTINCT i.id) n FROM issues i ${verJoin} WHERE 1=1 ${verCond} GROUP BY i.type`,
+    verVals
+  );
   let total = 0;
+  ['defect','enhancement','regulatory','security'].forEach(t => {
+    const el = document.getElementById("cnt-"+t); if (el) el.textContent = 0;
+  });
   rows.forEach(r => { const el=document.getElementById("cnt-"+r.type); if(el) el.textContent=r.n; total+=r.n; });
   document.getElementById("cnt-all").textContent = total;
-  const ported = await Q1(`SELECT COUNT(*) n FROM (SELECT i.id FROM issues i JOIN issue_versions iv ON i.id=iv.issue_id WHERE i.defect_number IS NOT NULL GROUP BY i.id HAVING COUNT(*)>1)`);
+
+  const portedVerJoin = hasVer ? `JOIN issue_versions iv3 ON iv3.issue_id=i.id JOIN releases r2 ON r2.id=iv3.release_id` : '';
+  const portedVerCond = hasVer ? `AND r2.patch_version IN (${verPh})` : '';
+  const ported = await Q1(
+    `SELECT COUNT(*) n FROM (
+       SELECT DISTINCT i.id FROM issues i ${portedVerJoin}
+       WHERE i.defect_number IS NOT NULL ${portedVerCond}
+       AND (SELECT COUNT(*) FROM issue_versions iv2 WHERE iv2.issue_id=i.id)>1
+     )`,
+    verVals
+  );
   const portedN = ported ? ported.n : 0;
   document.getElementById("cnt-ported").textContent = portedN;
-  document.getElementById("statsbar").innerHTML = `<b>${total}</b> issues · <b>${rows.length}</b> types · <b>${portedN}</b> ported`;
+  if (!hasVer) {
+    document.getElementById("statsbar").innerHTML = `<b>${total}</b> issues · <b>${rows.length}</b> types · <b>${portedN}</b> ported`;
+  }
 }
 
 // ── QUERY ─────────────────────────────────────────────────────────────────
@@ -1060,7 +1084,7 @@ function renderChips() {
   }
   for (const ver of filterVersions) {
     addChip(c, `v${ver}`, "--acc", () => {
-      filterVersions.delete(ver); refreshVersionHighlight(); buildBcTree(); triggerQuery();
+      filterVersions.delete(ver); refreshVersionHighlight(); buildBcTree(); updateCounts(); triggerQuery();
     });
   }
   if (searchQ.trim()) {
