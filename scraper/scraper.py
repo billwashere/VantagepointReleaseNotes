@@ -121,6 +121,19 @@ _VERSION_INDEX_RE = re.compile(
 )
 
 
+# From 2026.4 onward Deltek publishes release notes on the Learning Hub; the
+# help.deltek.com index still lists each release but links to the hub category.
+_HUB_LINK_RE = re.compile(
+    r"learning(?:-be)?\.deltek\.com/(?:category/vantagepoint_release_notes"
+    r"|bundle/Vantagepoint_[\d.]+_Release_Notes/)",
+    re.IGNORECASE,
+)
+HUB_RELEASE_URL = (
+    "https://learning-be.deltek.com/bundle/Vantagepoint_{major}_Release_Notes"
+    "/page/Vantagepoint_{version}_Release_Notes.html"
+)
+
+
 def discover_index_urls() -> list[str]:
     """
     Fetch the master index page and return all version-specific index URLs,
@@ -934,7 +947,10 @@ def parse_index_page(index_url: str) -> list[dict]:
 
     releases = []
     for a in soup.find_all("a", href=True):
-        if not re.search(r"ReleaseNotes\.htm$", a["href"], re.IGNORECASE):
+        href = a["href"]
+        is_legacy = re.search(r"ReleaseNotes\.htm$", href, re.IGNORECASE)
+        is_hub    = _HUB_LINK_RE.search(href)
+        if not (is_legacy or is_hub):
             continue
         text = a.get_text(strip=True)
         vm   = re.search(
@@ -948,12 +964,18 @@ def parse_index_page(index_url: str) -> list[dict]:
         rdate  = parse_date(dm.group(1)) if dm else None
         if not rdate:
             continue
+        if is_legacy:
+            url = urljoin(index_url, href)
+        else:
+            # Since 2026.4 the index rows all link to the Learning Hub category
+            # page, so build the per-release page URL from the version number.
+            url = HUB_RELEASE_URL.format(major=major, version=vm.group(1))
         releases.append({
             "major_version": major,
             "patch_version": vm.group(1),
             "build":         vm.group(2) or vm.group(1),
             "release_date":  rdate,
-            "url":           urljoin(index_url, a["href"]),
+            "url":           url,
         })
 
     log.info("Index %-8s → %d releases", major, len(releases))
